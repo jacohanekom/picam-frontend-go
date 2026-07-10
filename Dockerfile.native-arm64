@@ -1,0 +1,60 @@
+# Builds the picam-frontend Debian package NATIVELY for arm64, using a
+# real arm64 Docker daemon (e.g. colima on Apple Silicon, which runs a
+# genuine arm64 Linux VM — no QEMU emulation involved despite the host
+# being a Mac). Same approach as the sibling picam-orchestrator-go,
+# picam-raw, and picam-hailo projects' Dockerfile.native-arm64 — see
+# those files' headers for why native beats cross-compiling here in
+# general (avoids apt ever having to mix two architectures' packages at
+# once, which is what actually blocked picam-raw's cross-build attempt).
+#
+# For picam-frontend specifically there's less at stake than for
+# picam-orchestrator's cgo/libvpx build — this package is pure Go with
+# CGO_ENABLED=0, so Dockerfile.cross-arm64 (kept alongside this file)
+# already cross-compiles it just fine from an amd64 host too, with much
+# less machinery than picam-orchestrator's cross build needs. This file
+# exists mainly for consistency with the other three projects, and
+# because a native build can run the full test suite (go test), which a
+# cross-build skips (it can't execute an arm64 test binary on a
+# non-arm64 build host without emulation).
+#
+# Usage (from this directory, on a genuinely arm64 Docker host):
+#   docker build --platform linux/arm64 -f Dockerfile.native-arm64 -t picam-frontend-builder .
+#   docker create --name picam-frontend-extract picam-frontend-builder
+#   docker cp picam-frontend-extract:/out ./dist
+#   docker rm picam-frontend-extract
+
+FROM golang:1.26-bookworm AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        debhelper \
+        devscripts \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Separate layer for module downloads so editing source doesn't bust the
+# module cache on rebuild.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Stamp a build-time version (base version + UTC date/time as a Debian
+# local-version suffix — see picam-orchestrator-go/Dockerfile.native-arm64
+# for the rationale) before building, so every build produces a uniquely
+# versioned, uniquely named .deb.
+#
+# debian/rules already sets CGO_ENABLED=0; -d skips
+# dpkg-checkbuilddeps' check for the golang-go *package* specifically,
+# since we supply Go via this base image instead.
+RUN set -e; \
+    BASEVER="$(dpkg-parsechangelog -S Version)"; \
+    TS="$(date -u +%Y%m%d.%H%M%S)"; \
+    DEBEMAIL="jhanekom@gmail.com" DEBFULLNAME="Jaco Hanekom" \
+        dch --newversion "${BASEVER}+${TS}" --distribution stable --force-distribution \
+        "Automated native arm64 build (UTC ${TS})."; \
+    dpkg-buildpackage -us -uc -b -d
+
+# Build artifacts land one directory above the source tree by default
+# for "3.0 (native)" format source packages.
+RUN mkdir -p /out && cp /*.deb /*.changes /*.buildinfo /out/ 2>/dev/null || cp /*.deb /out/
