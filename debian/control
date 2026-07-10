@@ -1,0 +1,34 @@
+Source: picam-frontend
+Section: web
+Priority: optional
+Maintainer: Jaco Hanekom <jhanekom@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               golang-go (>= 2:1.22~)
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: picam-frontend
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Web UI + WebRTC relay for one or more picam-orchestrator backends (Go)
+ Single web UI for viewing and controlling one or more picam-orchestrator
+ backends (each on its own Pi). Serves a single-page browser UI, proxies
+ status JSON and control commands (camera switch, OSD toggle, annotation
+ toggle) to whichever Pi is selected, and relays WebRTC (VP8) media and
+ signaling between browsers and the selected Pi's picam-orchestrator — the
+ browser only ever talks to picam-frontend, never directly to a Pi.
+ .
+ WebRTC media is peer-to-peer by nature, which would otherwise break that
+ guarantee — so this process is a small SFU-lite relay, not just a byte
+ proxy for the media path: it terminates WebRTC with each browser viewer
+ AND with each picam-orchestrator backend, forwarding raw RTP packets
+ between them. One upstream connection per (Pi, stream) pair is shared
+ across every browser watching that combination.
+ .
+ This is a from-scratch Go reimplementation of the original C++
+ picam-frontend, with the same config file format and HTTP endpoint
+ surface — see its README for the full behavioral spec. WebRTC is provided
+ by the pure-Go pion/webrtc (no vendored libdatachannel/OpenSSL build
+ step).
+ .
+ Config: /etc/picam-frontend/config.ini

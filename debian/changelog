@@ -1,0 +1,20 @@
+picam-frontend (1.0.0) stable; urgency=medium
+
+  * Initial Go reimplementation of picam-frontend, replacing the
+    C++/libdatachannel build with a Go module using pion/webrtc
+    (pure-Go WebRTC, no vendored libdatachannel/OpenSSL build step).
+    Same config.ini format and defaults, and the same HTTP endpoint
+    surface (GET /, /pis.json, /status.json, /osd, /annotate, /camera,
+    POST /webrtc/offer) as the original C++ implementation. The
+    single-page web UI is unchanged (identical API surface).
+  * The upstream (picam-orchestrator-facing) and downstream
+    (browser-facing) WebRTC legs are both raw-RTP relays, same as the
+    C++ original's SFU-lite design: one shared upstream connection per
+    (Pi, stream) pair, established lazily on first subscriber and torn
+    down when the last viewer leaves.
+  * The hand-rolled HTTP proxy client (raw sockets, manual
+    connect-timeout, CRLF-injection sanitizing) is replaced by Go's
+    stdlib net/http, which handles hostname resolution, timeouts, and
+    safe query encoding without any of that custom code.
+
+ -- Jaco Hanekom <jhanekom@gmail.com>  Thu, 09 Jul 2026 10:00:00 +0000
