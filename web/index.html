@@ -624,19 +624,11 @@
               </button>
             </div>
 
-            <!-- Bottom bar: Stream + Lens + Annotate -->
+            <!-- Bottom bar: Lens + Annotate. Stream quality (main/lores) is
+                 no longer a manual choice here -- picam-orchestrator picks
+                 it automatically per client based on connection quality
+                 (see webrtcsrv.Client.adaptQuality). -->
             <div class="bottom-bar">
-              <div class="group">
-                <span class="group-label">Stream</span>
-                <nav class="stream-nav">
-                  <button class="stream-btn" id="btn-main" data-stream="main">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-video"/></svg>Main
-                  </button>
-                  <button class="stream-btn" id="btn-lores" data-stream="lores">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-video"/></svg>Lores
-                  </button>
-                </nav>
-              </div>
 
               <div class="group">
                 <span class="group-label">Lens</span>
@@ -730,7 +722,6 @@
     const backBtn       = document.getElementById('backBtn');
     const drilldownTitle = document.getElementById('drilldownTitle');
 
-    const buttons   = document.querySelectorAll('#drilldownView .stream-btn[data-stream]');
     const video     = document.getElementById('streamVideo');
     const viewer    = document.getElementById('viewer');
     const fsBtn     = document.getElementById('fsBtn');
@@ -745,14 +736,14 @@
     const annotateNav = document.getElementById('annotateNav');
     const annotateButtons = annotateNav.querySelectorAll('.stream-btn');
 
-    const titles = { main: 'Main', lores: 'Lores' };
-
-    // Track which Pi + stream the drill-down view is watching — both
-    // sent as query params to /webrtc/offer so the frontend knows which
-    // backend and feed to relay.
+    // Track which Pi the drill-down view is watching — sent as a query
+    // param to /webrtc/offer so the frontend knows which backend to
+    // relay. The drill-down view always requests the "main" stream;
+    // picam-orchestrator picks the actual delivered quality per client
+    // based on connection quality (see webrtcsrv.Client.adaptQuality),
+    // so there's no client-side stream choice to track alongside it.
     const urlParams = new URLSearchParams(window.location.search);
     let currentPi     = urlParams.get('pi') || '';
-    let currentStream = urlParams.get('stream') || 'main';
     let currentCamera = null;  // unknown until the first /status.json poll reports active_camera
     let slowHintTimer = null;
     let pisCache = [];          // last loaded /pis.json result
@@ -849,17 +840,14 @@
       loadCameraGrid();
     }
 
-    function showDrilldown(piName, stream) {
+    function showDrilldown(piName) {
       inDrilldown = true;
       currentPi = piName;
-      currentStream = stream || currentStream || 'main';
       gridView.style.display = 'none';
       drilldownView.style.display = '';
       const pi = pisCache.find(p => p.name === piName);
       drilldownTitle.textContent = pi ? pi.label : piName;
-      history.replaceState(null, '', '?pi=' + encodeURIComponent(piName) +
-                                      '&stream=' + encodeURIComponent(currentStream));
-      setActiveStream(currentStream);
+      history.replaceState(null, '', '?pi=' + encodeURIComponent(piName));
       reloadStream();
       if (!pollTimer) pollTimer = setInterval(pollStatus, 3000);
       pollStatus();
@@ -898,7 +886,7 @@
 
       tile.appendChild(thumb);
       tile.appendChild(footer);
-      tile.addEventListener('click', () => showDrilldown(pi.name, 'main'));
+      tile.addEventListener('click', () => showDrilldown(pi.name));
 
       // Operate directly on dotSpan rather than looking it up via
       // getElementById by a constructed id — the previous version did
@@ -991,17 +979,16 @@
       clearTimeout(slowHintTimer);
     }
 
-    // ── Drill-down: stream selection ──────────────────────────────────────
-    function setActiveStream(stream) {
-      currentStream = stream;
-      buttons.forEach(b => b.classList.toggle('active', b.dataset.stream === stream));
-    }
-
+    // ── Drill-down: stream connection ──────────────────────────────────────
+    // Always requests "main" -- picam-orchestrator adapts the actually
+    // delivered quality per client based on connection quality (see
+    // webrtcsrv.Client.adaptQuality), so there's no client-side stream
+    // choice here anymore.
     async function reloadStream() {
       showLoading();
       if (drilldownPc) { drilldownPc.close(); drilldownPc = null; }
       try {
-        drilldownPc = await connectWebRTC(currentPi, currentStream, video, (failedPc) => {
+        drilldownPc = await connectWebRTC(currentPi, 'main', video, (failedPc) => {
           if (drilldownPc !== failedPc) return;  // superseded by a newer reloadStream() call
           drilldownPc = null;
           if (!inDrilldown) return;
@@ -1014,12 +1001,6 @@
         setTimeout(() => { if (inDrilldown) reloadStream(); }, 1000);
       }
     }
-
-    function selectStream(stream) {
-      setActiveStream(stream);
-      reloadStream();
-    }
-    buttons.forEach(b => b.addEventListener('click', () => selectStream(b.dataset.stream)));
     video.addEventListener('playing', hideLoading);
 
     // ── Drill-down: Lens (camera 0/1) ─────────────────────────────────────
@@ -1033,7 +1014,7 @@
     // an unnecessary restriction on navigating away while a switch is
     // pending. Reused for the camera-switch grayout below.
     function allDrilldownControls() {
-      return [...buttons, ...cameraButtons, ...annotateButtons, osdCameraToggle, osdTimeToggle];
+      return [...cameraButtons, ...annotateButtons, osdCameraToggle, osdTimeToggle];
     }
 
     function setControlsDisabled(disabled) {
@@ -1294,7 +1275,7 @@
       // drill-down for it rather than showing the grid first.
       fetch('/pis.json').then(r => r.json()).then(pis => {
         pisCache = pis;
-        showDrilldown(currentPi, currentStream);
+        showDrilldown(currentPi);
       }).catch(() => { showGrid(); });
     } else {
       showGrid();

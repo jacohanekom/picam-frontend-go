@@ -208,7 +208,18 @@ func (u *upstream) removeViewer(v *viewer) {
 	if !v.left.CompareAndSwap(false, true) {
 		return // Disconnected/Failed/Closed can each fire; only act once
 	}
+	u.detachViewer(v)
+	go v.pc.Close()
+}
 
+// detachViewer removes v from this upstream's fan-out set without
+// closing v's own PeerConnection — used by adaptQuality (via
+// Manager.switchViewerStream) to move a still-live viewer to a
+// different upstream, as opposed to removeViewer's full teardown when
+// the viewer disconnects entirely. Tears down this upstream if that was
+// its last viewer, same as removeViewer (no point keeping
+// picam-orchestrator encoding a stream nobody's watching anymore).
+func (u *upstream) detachViewer(v *viewer) {
 	u.mgr.mu.Lock()
 	u.mu.Lock()
 	delete(u.viewers, v)
@@ -220,8 +231,6 @@ func (u *upstream) removeViewer(v *viewer) {
 		}
 	}
 	u.mgr.mu.Unlock()
-
-	go v.pc.Close()
 
 	if empty {
 		log.Printf("[Relay] Last viewer left %s/%s, tearing down upstream", u.key.pi, u.key.stream)

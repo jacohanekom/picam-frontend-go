@@ -10,6 +10,7 @@ package relay
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/pion/webrtc/v4"
@@ -114,6 +115,30 @@ func (m *Manager) getOrCreateUpstream(pi config.Backend, stream string) (*upstre
 	}
 	m.upstreams[k] = u
 	return u, nil
+}
+
+// switchViewerStream moves v from its current upstream to (pi, newStream)
+// — lazily establishing that upstream if it doesn't exist yet — and
+// requests a keyframe on it so v's decoder gets a clean start rather
+// than referencing frames from the stream it just left. Used by
+// viewer.adaptQuality. Returns false (leaving v unchanged) if the new
+// upstream couldn't be reached.
+func (m *Manager) switchViewerStream(v *viewer, newStream string) bool {
+	newUp, err := m.getOrCreateUpstream(v.pi, newStream)
+	if err != nil {
+		log.Printf("[Relay] adaptQuality: could not switch %s to %s: %v", v.pi.Name, newStream, err)
+		return false
+	}
+
+	v.mu.Lock()
+	oldUp := v.current
+	v.current = newUp
+	v.mu.Unlock()
+
+	newUp.addViewer(v)
+	oldUp.detachViewer(v)
+	newUp.requestKeyframe()
+	return true
 }
 
 // Close closes every live upstream relay's PeerConnection. Called once,
