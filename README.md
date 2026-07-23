@@ -11,6 +11,8 @@ The original C++ implementation vendors [libdatachannel](https://github.com/paul
 
 Both WebRTC legs remain a **raw RTP relay**, exactly like the C++ original: the upstream (picam-orchestrator-facing) track's RTP packets are fanned out verbatim to every downstream (browser-facing) track via `TrackLocalStaticRTP.WriteRTP` — no decode, no re-encode. This is pion's own documented SFU pattern (see its `examples/broadcast`), generalized from 1-to-1 to 1-to-N. The single-page web UI (`web/index.html`) is unchanged — it talks to the same JSON/WHEP endpoints either way.
 
+picam-orchestrator streams its `main` feed at full native capture resolution (no downscale) as two simultaneous, independently-bitrated VP8 encodes — `main-high`/`main-low` — rather than one fixed encode. A browser's detail-view request for `main` starts this process's upstream connection on `main-high`; `relay.viewer.adaptQuality` then moves that specific browser viewer's own upstream between `main-high` and `main-low` based on *that browser's* downstream RTCP packet-loss reports (never picam-orchestrator's own link to this process, which is LAN-only and effectively always clean — see picam-orchestrator-go's README for why the real adaptation belongs here, not there). A struggling viewer never drops below native resolution, just bitrate/quality. `lores` is unrelated to any of this — a third, always-pinned, always-native-lores-resolution stream used unconditionally for the grid view's overview thumbnails.
+
 ## Requirements
 
 **Build:**
@@ -96,7 +98,7 @@ ice_port_max = 50200
 |---|---|
 | `GET /` | Serves `index.html` |
 | `GET /pis.json` | JSON array of configured Pi objects (`{"name":...,"label":...}`) |
-| `POST /webrtc/offer?pi=X&stream=Y` | WHEP-style signaling for a browser viewer — body `{"sdp":"..."}` (SDP offer), response `{"sdp":"..."}` (SDP answer). Media then flows over the resulting WebRTC connection, relayed from Pi X. |
+| `POST /webrtc/offer?pi=X&stream=main\|lores` | WHEP-style signaling for a browser viewer — body `{"sdp":"..."}` (SDP offer), response `{"sdp":"..."}` (SDP answer). Media then flows over the resulting WebRTC connection, relayed from Pi X. `main` requests are adaptive (see Architecture) — the browser never chooses `main-high`/`main-low` directly. |
 | `GET /status.json?pi=X` | Proxied telemetry JSON from Pi X |
 | `GET /camera?pi=X&id=N` | Switch camera lens on Pi X |
 | `GET /osd?pi=X&camera_id=true\|false&time=true\|false` | Toggle OSD overlays |
@@ -124,7 +126,9 @@ Browser ──── HTTP ─────► picam-frontend (this) ──── 
 
 ### Relay lifecycle
 
-`relay.Manager.Subscribe` (called from `POST /webrtc/offer`) gets-or-creates the upstream relay for the requested `(pi, stream)`, answers the browser's offer with a sendonly VP8 track, and registers a `viewer` against that upstream. The upstream's `OnTrack` read loop fans out every RTP packet it receives to each registered viewer's track (`upstream.fanOut`). When a viewer's `PeerConnection` disconnects, `upstream.removeViewer` unregisters it and — if it was the last viewer — tears down the upstream connection entirely, so picam-orchestrator stops encoding for nobody. A `sync.Mutex` on the `Manager` guards the upstream map (held across the first-establishment network round trip, same tradeoff the C++ original made); each `upstream`'s own mutex guards its viewer set and is never held during I/O, so the hot RTP fan-out path never contends with slow connection setup/teardown.
+`relay.Manager.Subscribe` (called from `POST /webrtc/offer`) maps the browser's `stream` request onto an upstream relay key — `"main"` becomes an initial upstream of `"main-high"`, `"lores"` is unchanged — gets-or-creates that upstream, answers the browser's offer with a sendonly VP8 track, and registers a `viewer` against it. The upstream's `OnTrack` read loop fans out every RTP packet it receives to each registered viewer's track (`upstream.fanOut`). When a viewer's `PeerConnection` disconnects, `upstream.removeViewer` unregisters it and — if it was the last viewer — tears down the upstream connection entirely, so picam-orchestrator stops encoding for nobody. A `sync.Mutex` on the `Manager` guards the upstream map (held across the first-establishment network round trip, same tradeoff the C++ original made); each `upstream`'s own mutex guards its viewer set and is never held during I/O, so the hot RTP fan-out path never contends with slow connection setup/teardown.
+
+A `"main"`-ceiling viewer additionally watches its own downstream RTCP Receiver Reports and calls `viewer.adaptQuality` (a smoothed packet-loss estimate with hysteresis — quick to downgrade, slower/cooled-down to upgrade, to avoid flapping on a borderline connection) to move *that one viewer* between the `"main-high"` and `"main-low"` upstreams via `Manager.switchViewerStream` — lazily establishing the target upstream if it's not already live, detaching from the old one, and requesting a fresh keyframe so the viewer's decoder isn't left referencing frames from the upstream it just left. A `"lores"`-pinned viewer (grid-view thumbnails) skips this entirely — there's no ladder to adapt on.
 
 PeerConnection closes triggered from within a connection-state-change callback happen on their own goroutine rather than synchronously in that callback — the C++ original hit a real, reproducible deadlock this way (destroying a `shared_ptr` re-entered the same unsubscribe path on the same thread while its lock was still held); closing asynchronously here side-steps that whole class of bug regardless of whether pion's own callback dispatch has the same hazard.
 

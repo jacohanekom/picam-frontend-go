@@ -29,7 +29,9 @@ var ErrUpstreamUnavailable = errors.New("could not reach backend")
 var ErrGatherTimeout = errors.New("failed to generate answer")
 
 // relayKey identifies one upstream relay: a configured Pi's name plus the
-// stream ("main"/"lores") requested from its picam-orchestrator.
+// stream ("main-high"/"main-low"/"lores") requested from its
+// picam-orchestrator — see viewer.Subscribe for how a browser's own
+// "main"/"lores" request maps onto these.
 type relayKey struct {
 	pi     string
 	stream string

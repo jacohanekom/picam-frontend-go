@@ -23,15 +23,19 @@ type viewer struct {
 	mgr *Manager
 	pi  config.Backend
 
-	// maxStream is the best quality this viewer may ever be raised to,
-	// fixed at connect time from the browser's ?stream= request.
-	// Overview/thumbnail viewers request "lores" and are pinned there —
-	// adaptQuality skips them entirely. Detail-view viewers request
-	// "main" and range between "lores" (floor) and "main" (ceiling)
-	// based on THIS viewer's own downstream connection quality — this is
-	// the actual browser<->picam-frontend leg, unlike
+	// maxStream is the browser's own original ?stream= request ("main"
+	// or "lores"), fixed at connect time — a ceiling *group*, not a
+	// literal picam-orchestrator stream name (see Subscribe, which maps
+	// "main" to an initial upstream of "main-high"). Overview/thumbnail
+	// viewers request "lores" and are pinned there — adaptQuality skips
+	// them entirely. Detail-view viewers request "main" and range
+	// between "main-low" (floor) and "main-high" (ceiling) — never
+	// dropping below picam-orchestrator's native resolution, just a
+	// lower bitrate — based on THIS viewer's own downstream connection
+	// quality. This is the actual browser<->picam-frontend leg, unlike
 	// picam-orchestrator's own (LAN-only, effectively always-clean)
-	// upstream link, so this is where real adaptive quality belongs.
+	// upstream link, so this is where real adaptive quality belongs —
+	// picam-orchestrator's own streams are flat/pinned, no adaptation.
 	maxStream string
 
 	mu      sync.Mutex
@@ -63,7 +67,16 @@ func (m *Manager) Subscribe(pi config.Backend, stream, offerSDP string) (answerS
 		}
 	}()
 
-	up, err := m.getOrCreateUpstream(pi, stream)
+	// The browser's stream request is a ceiling group, not a literal
+	// picam-orchestrator stream name: "main" establishes its initial
+	// upstream at "main-high" (the adaptive ceiling — see adaptQuality
+	// below); "lores" is unrelated and unchanged (grid-view thumbnails,
+	// always pinned there, no ladder).
+	upstreamStream := stream
+	if stream == "main" {
+		upstreamStream = "main-high"
+	}
+	up, err := m.getOrCreateUpstream(pi, upstreamStream)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +135,7 @@ func (m *Manager) Subscribe(pi config.Backend, stream, offerSDP string) (answerS
 			// upgrade back once loss is nearly clean, and never within
 			// switchCooldown of the last switch — without this gap, a
 			// connection hovering right at the boundary would flap
-			// between resolutions every report.
+			// between bitrate tiers every report.
 			downgradeLossThreshold = 0.08
 			upgradeLossThreshold   = 0.01
 			switchCooldown         = 8 * time.Second
@@ -201,14 +214,22 @@ func (m *Manager) Subscribe(pi config.Backend, stream, offerSDP string) (answerS
 	return final.SDP, nil
 }
 
-// adaptQuality switches this viewer between the "main" and "lores"
-// upstream relays for its Pi based on a smoothed packet-loss estimate
-// (see the RTCP goroutine in Subscribe). Mirrors
-// picam-orchestrator-go's webrtcsrv.Client.adaptQuality, one layer
-// further out: same hysteresis approach (asymmetric thresholds plus a
-// cooldown, to avoid flapping on a borderline connection), applied to
-// the browser<->picam-frontend leg instead of picam-frontend's own
-// upstream link.
+// adaptQuality switches this viewer between the "main-high" and
+// "main-low" upstream relays for its Pi — two independently-bitrated
+// encodes of picam-orchestrator's native-resolution main stream, never a
+// resolution drop — based on a smoothed packet-loss estimate (see the
+// RTCP goroutine in Subscribe). Only ever called for a "main"-ceiling
+// viewer (see the maxStream=="lores" guard where this is invoked); a
+// "lores" viewer has no ladder to adapt on since it's an unrelated,
+// always-pinned stream for grid-view thumbnails. Was previously a
+// resolution ladder (main/lores); repointed to a bitrate ladder on the
+// same native resolution once picam-orchestrator stopped downscaling
+// main and started producing two bitrate tiers of it instead — see
+// picam-orchestrator-go's README. No longer mirrored by an equivalent
+// mechanism in picam-orchestrator-go's webrtcsrv.Client: that link
+// (picam-frontend's own upstream to picam-orchestrator) is LAN-only and
+// effectively always clean, so real adaptation only ever belonged here,
+// on the browser<->picam-frontend leg.
 func (v *viewer) adaptQuality(lossEMA float64, lastSwitch *time.Time, downThresh, upThresh float64, cooldown time.Duration) {
 	now := time.Now()
 	if now.Sub(*lastSwitch) < cooldown {
@@ -219,15 +240,15 @@ func (v *viewer) adaptQuality(lossEMA float64, lastSwitch *time.Time, downThresh
 	v.mu.Unlock()
 
 	switch {
-	case current == "main" && lossEMA > downThresh:
-		if v.mgr.switchViewerStream(v, "lores") {
+	case current == "main-high" && lossEMA > downThresh:
+		if v.mgr.switchViewerStream(v, "main-low") {
 			*lastSwitch = now
-			log.Printf("[Relay] %s viewer downgraded main->lores (loss=%.1f%%)", v.pi.Name, lossEMA*100)
+			log.Printf("[Relay] %s viewer downgraded main-high->main-low (loss=%.1f%%)", v.pi.Name, lossEMA*100)
 		}
-	case current == "lores" && lossEMA < upThresh:
-		if v.mgr.switchViewerStream(v, "main") {
+	case current == "main-low" && lossEMA < upThresh:
+		if v.mgr.switchViewerStream(v, "main-high") {
 			*lastSwitch = now
-			log.Printf("[Relay] %s viewer upgraded lores->main (loss=%.1f%%)", v.pi.Name, lossEMA*100)
+			log.Printf("[Relay] %s viewer upgraded main-low->main-high (loss=%.1f%%)", v.pi.Name, lossEMA*100)
 		}
 	}
 }
