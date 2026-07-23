@@ -640,7 +640,7 @@
       <div>
         <div class="section-label">Menu</div>
         <nav class="stream-nav vertical">
-          <button class="nav-btn active" id="navCameras">
+          <button class="nav-btn" id="navCameras">
             <svg class="icon" aria-hidden="true"><use href="#ic-grid"/></svg>Cameras
           </button>
           <div id="sidebarCameraList">
@@ -936,8 +936,10 @@
     }
 
     // Highlights whichever sidebar shortcut matches the camera currently
-    // drilled into (none highlighted while on the grid).
+    // drilled into, and "Cameras" itself only while on the grid — the
+    // two are mutually exclusive, never both highlighted at once.
     function updateSidebarActive() {
+      navCameras.classList.toggle('active', !inDrilldown);
       sidebarCameraList.querySelectorAll('.nav-btn-sub').forEach((btn) => {
         btn.classList.toggle('active', inDrilldown && btn.dataset.pi === currentPi);
       });
