@@ -96,6 +96,19 @@
     background: var(--accent-bg);
     color: var(--accent);
   }
+  /* Per-camera shortcuts, listed under the "Cameras" nav item — each
+     jumps straight to that camera's drill-down view. */
+  #sidebarCameraList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 4px;
+  }
+  .nav-btn-sub {
+    padding-left: 34px;
+    font-size: 13px;
+  }
+  .nav-btn-sub .icon { width: 15px; height: 15px; }
 
   /* ── Shared small-control styles (reused in the drill-down bottom bar
      and right panel) ──────────────────────────────────────────────────── */
@@ -630,6 +643,10 @@
           <button class="nav-btn active" id="navCameras">
             <svg class="icon" aria-hidden="true"><use href="#ic-grid"/></svg>Cameras
           </button>
+          <div id="sidebarCameraList">
+            <!-- populated by JS from /pis.json: one shortcut per configured
+                 camera, jumping straight to its drill-down view -->
+          </div>
         </nav>
       </div>
     </aside>
@@ -764,6 +781,7 @@
     const overlayBg   = document.getElementById('overlayBg');
     const menuToggle  = document.getElementById('menuToggle');
     const navCameras  = document.getElementById('navCameras');
+    const sidebarCameraList = document.getElementById('sidebarCameraList');
 
     const gridView      = document.getElementById('gridView');
     const drilldownView = document.getElementById('drilldownView');
@@ -895,6 +913,36 @@
       return pc;
     }
 
+    // ── Sidebar: per-camera shortcuts under "Cameras" ────────────────────
+    // Rebuilt from whatever list last populated pisCache (grid load or
+    // startup), so it reflects the same set/order the grid shows — kept
+    // separate from the grid tiles themselves since the sidebar is
+    // visible from both the grid and drill-down views.
+    function renderSidebarCameraList(pis) {
+      sidebarCameraList.innerHTML = '';
+      for (const pi of pis) {
+        const btn = document.createElement('button');
+        btn.className = 'nav-btn nav-btn-sub';
+        btn.dataset.pi = pi.name;
+        btn.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>';
+        const label = document.createElement('span');
+        label.textContent = pi.label;  // textContent, not innerHTML — avoids any
+                                        // HTML injection risk from a config value
+        btn.appendChild(label);
+        btn.addEventListener('click', () => showDrilldown(pi.name));
+        sidebarCameraList.appendChild(btn);
+      }
+      updateSidebarActive();
+    }
+
+    // Highlights whichever sidebar shortcut matches the camera currently
+    // drilled into (none highlighted while on the grid).
+    function updateSidebarActive() {
+      sidebarCameraList.querySelectorAll('.nav-btn-sub').forEach((btn) => {
+        btn.classList.toggle('active', inDrilldown && btn.dataset.pi === currentPi);
+      });
+    }
+
     // ── View switching: grid <-> drill-down ──────────────────────────────
     function showGrid() {
       inDrilldown = false;
@@ -907,6 +955,7 @@
       // Update the URL without a reload, so back/forward + reload land
       // on the grid rather than re-opening whatever was last viewed.
       history.replaceState(null, '', window.location.pathname);
+      updateSidebarActive();
       loadCameraGrid();
     }
 
@@ -918,6 +967,7 @@
       const pi = pisCache.find(p => p.name === piName);
       drilldownTitle.textContent = pi ? pi.label : piName;
       history.replaceState(null, '', '?pi=' + encodeURIComponent(piName));
+      updateSidebarActive();
       reloadStream();
       if (!pollTimer) pollTimer = setInterval(pollStatus, 3000);
       pollStatus();
@@ -1265,12 +1315,14 @@
         const pis = await resp.json();
         if (pis.length === 0) {
           pisCache = [];
+          renderSidebarCameraList(pisCache);
           cameraGrid.innerHTML =
             '<div style="color:var(--text-dim);font-size:13px;">No cameras configured.</div>';
           return;
         }
         updateGridCols();
         pisCache = applyGridLayout(pis);
+        renderSidebarCameraList(pisCache);
         for (const pi of pisCache) {
           const tile = await buildTile(pi);
           cameraGrid.appendChild(tile);
@@ -1591,6 +1643,7 @@
       // drill-down for it rather than showing the grid first.
       fetch('/pis.json').then(r => r.json()).then(pis => {
         pisCache = pis;
+        renderSidebarCameraList(pisCache);
         showDrilldown(currentPi);
       }).catch(() => { showGrid(); });
     } else {
