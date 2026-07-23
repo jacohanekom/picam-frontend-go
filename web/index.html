@@ -244,6 +244,7 @@
     gap: 12px;
     margin-bottom: 20px;
   }
+  .content-header .spacer { flex: 1; }
   .content-header h1 {
     font-size: 18px;
     font-weight: 500;
@@ -264,9 +265,18 @@
   .back-btn:hover { background: var(--bg-hover); color: var(--text); }
 
   /* ── Camera grid ──────────────────────────────────────────────────────── */
+  /* --grid-cols is computed in JS from the container's width (see
+     updateGridCols()) rather than a fixed breakpoint count, so this
+     keeps the old auto-fill/minmax behavior's "reasonably-sized tiles
+     regardless of screen width" property while still giving each tile a
+     known, wholenumber column width to size/resize against. Row height
+     is a fixed unit (not content-driven) so grid-row spans behave
+     predictably — GRID_GAP/ROW_HEIGHT constants in JS must stay in sync
+     with the gap/grid-auto-rows values below. */
   .camera-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: repeat(var(--grid-cols, 4), 1fr);
+    grid-auto-rows: 220px;
     gap: 16px;
   }
   .camera-tile {
@@ -275,24 +285,60 @@
     border-radius: 10px;
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, opacity 0.15s;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* --col-span/--row-span are set per-tile from saved layout state
+       (see tileSpans in JS) — grid-column/row: span N is what actually
+       makes a tile bigger/smaller; the browser's own grid auto-placement
+       then reflows everything else around it, so tiles can never
+       overlap without any collision-detection code of our own. */
+    grid-column: span var(--col-span, 1);
+    grid-row: span var(--row-span, 1);
   }
   .camera-tile:hover { border-color: var(--accent); }
+  .camera-tile.dragging { opacity: 0.4; }
+  .camera-tile.drag-over { border-color: var(--accent); border-style: dashed; }
+  .camera-tile.resizing { border-color: var(--accent); }
   .camera-tile .thumb {
     position: relative;
-    width: 100%;
-    aspect-ratio: 1 / 1;
+    flex: 1;
+    min-height: 0;
     background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
   }
-  .camera-tile .thumb img {
+  .camera-tile .thumb img,
+  .camera-tile .thumb video {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
+  }
+  .tile-resize-handle {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: nwse-resize;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 2;
+    touch-action: none; /* this handle's own gesture is always a resize, never a scroll */
+  }
+  .tile-resize-handle .icon { width: 16px; height: 16px; }
+  .camera-tile:hover .tile-resize-handle,
+  .tile-resize-handle:focus-visible { opacity: 1; }
+  @media (hover: none) {
+    .tile-resize-handle { opacity: 0.7; }
   }
   .camera-tile .unavailable {
     display: flex;
@@ -563,6 +609,7 @@
     <symbol id="ic-grid" viewBox="0 0 24 24"><path d="M4 4h6v6h-6z" /> <path d="M14 4h6v6h-6z" /> <path d="M4 14h6v6h-6z" /> <path d="M14 14h6v6h-6z" /></symbol>
     <symbol id="ic-alert-triangle" viewBox="0 0 24 24"><path d="M12 9v4" /> <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.871l-8.106 -13.534a1.914 1.914 0 0 0 -3.274 0z" /> <path d="M12 16h.01" /></symbol>
     <symbol id="ic-arrow-left" viewBox="0 0 24 24"><path d="M5 12l14 0" /> <path d="M5 12l6 6" /> <path d="M5 12l6 -6" /></symbol>
+    <symbol id="ic-resize" viewBox="0 0 24 24"><path d="M16 20l4 -4" /> <path d="M4 20l16 -16" /></symbol>
   </svg>
 
   <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
@@ -593,6 +640,8 @@
       <div id="gridView">
         <div class="content-header">
           <h1>Cameras</h1>
+          <span class="spacer"></span>
+          <button class="back-btn" id="resetLayoutBtn">Reset layout</button>
         </div>
         <div class="camera-grid" id="cameraGrid">
           <!-- populated by JS from /pis.json + per-Pi health checks -->
@@ -719,6 +768,7 @@
     const gridView      = document.getElementById('gridView');
     const drilldownView = document.getElementById('drilldownView');
     const cameraGrid    = document.getElementById('cameraGrid');
+    const resetLayoutBtn = document.getElementById('resetLayoutBtn');
     const backBtn       = document.getElementById('backBtn');
     const drilldownTitle = document.getElementById('drilldownTitle');
 
@@ -757,6 +807,26 @@
     // tracking (nothing analogous existed for <img> tags).
     let drilldownPc = null;         // single connection for the detail view
     let gridPcs = new Map();        // piName -> RTCPeerConnection, for grid tiles
+
+    // ── Grid layout: resizable/moveable tiles, persisted locally ─────────
+    // GRID_GAP/ROW_HEIGHT must stay in sync with the .camera-grid CSS
+    // (gap / grid-auto-rows) — both sides need the same numbers to
+    // convert a resize-drag's pixel delta into a column/row span delta.
+    const GRID_LAYOUT_KEY = 'picam-grid-layout';
+    const GRID_GAP = 16;
+    const ROW_HEIGHT = 220;
+    const MIN_TILE_WIDTH = 220; // used to compute how many columns fit the container
+    const MAX_ROW_SPAN = 4;
+    const DRAG_THRESHOLD = 6;   // px of movement before a press becomes a reorder-drag
+    const TOUCH_HOLD_MS = 250;  // touch must be held roughly still this long before a drag arms,
+                                 // so an ordinary scroll/swipe on a tile isn't hijacked as a drag
+
+    let tileSpans = new Map();  // pi name -> { colSpan, rowSpan }, current in-memory layout
+    let gridCols = 4;           // recomputed by updateGridCols()
+    let dragState = null;       // in-progress reorder gesture, or null
+    let resizeState = null;     // in-progress resize gesture, or null
+    let suppressNextClick = false; // set once a drag actually moved the tile, so the
+                                    // subsequent synthetic click doesn't also open the drill-down
 
     // ── Sidebar (mobile drawer) ──────────────────────────────────────────
     function openSidebar()  { sidebar.classList.add('open');  overlayBg.classList.add('open'); }
@@ -857,6 +927,231 @@
     navCameras.addEventListener('click', showGrid);
     backBtn.addEventListener('click', showGrid);
 
+    // ── Grid layout: persistence ──────────────────────────────────────────
+    function loadGridLayout() {
+      try {
+        const raw = localStorage.getItem(GRID_LAYOUT_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(e => e && typeof e.name === 'string') : [];
+      } catch (e) {
+        return []; // corrupt/unparseable — fall back to the default layout rather than throw
+      }
+    }
+
+    function saveGridLayout() {
+      const layout = pisCache.map(pi => {
+        const span = tileSpans.get(pi.name) || { colSpan: 1, rowSpan: 1 };
+        return { name: pi.name, colSpan: span.colSpan, rowSpan: span.rowSpan };
+      });
+      try {
+        localStorage.setItem(GRID_LAYOUT_KEY, JSON.stringify(layout));
+      } catch (e) {
+        // Storage unavailable/full/disabled (private browsing, quota, ...) —
+        // the layout just won't persist across reloads; not fatal.
+      }
+    }
+
+    function resetGridLayout() {
+      try { localStorage.removeItem(GRID_LAYOUT_KEY); } catch (e) {}
+      tileSpans = new Map();
+      loadCameraGrid();
+    }
+    resetLayoutBtn.addEventListener('click', resetGridLayout);
+
+    function clampSpan(n, max) {
+      n = Math.round(Number(n));
+      if (!Number.isFinite(n) || n < 1) return 1;
+      return Math.min(n, max);
+    }
+
+    // applyGridLayout reconciles the live /pis.json list against the
+    // saved layout: order follows the saved layout first (for Pis that
+    // still exist), then any newly-configured Pis are appended in their
+    // natural order; spans come from the saved layout, defaulting to
+    // 1x1 for anything not previously saved. Populates tileSpans as a
+    // side effect and returns the reordered Pi list.
+    function applyGridLayout(pis) {
+      const saved = loadGridLayout();
+      const byName = new Map(pis.map(p => [p.name, p]));
+
+      tileSpans = new Map();
+      for (const e of saved) {
+        if (byName.has(e.name)) {
+          tileSpans.set(e.name, { colSpan: clampSpan(e.colSpan, gridCols), rowSpan: clampSpan(e.rowSpan, MAX_ROW_SPAN) });
+        }
+      }
+
+      const ordered = [];
+      const remaining = new Map(byName);
+      for (const e of saved) {
+        const p = remaining.get(e.name);
+        if (p) { ordered.push(p); remaining.delete(e.name); }
+      }
+      for (const p of pis) {
+        if (remaining.has(p.name)) { ordered.push(p); remaining.delete(p.name); }
+      }
+      for (const p of pis) {
+        if (!tileSpans.has(p.name)) tileSpans.set(p.name, { colSpan: 1, rowSpan: 1 });
+      }
+      return ordered;
+    }
+
+    // updateGridCols recomputes how many fixed-width columns currently
+    // fit the grid container and publishes it as --grid-cols, so CSS
+    // Grid lays tiles out at roughly MIN_TILE_WIDTH each regardless of
+    // screen size — the same responsive intent the old
+    // auto-fill/minmax() had, just as an explicit integer JS can also
+    // use for resize-drag math (see attachResizeHandle).
+    function updateGridCols() {
+      const width = cameraGrid.clientWidth;
+      if (!width) return; // grid not visible right now (e.g. in drill-down) — leave gridCols as-is
+      gridCols = Math.max(1, Math.floor((width + GRID_GAP) / (MIN_TILE_WIDTH + GRID_GAP)));
+      cameraGrid.style.setProperty('--grid-cols', String(gridCols));
+    }
+    let gridColsResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(gridColsResizeTimer);
+      gridColsResizeTimer = setTimeout(() => { if (!inDrilldown) updateGridCols(); }, 150);
+    });
+
+    // ── Grid layout: reorder-by-drag ────────────────────────────────────────
+    // Pointer Events (not the HTML5 Drag-and-Drop API) specifically for
+    // touch support — HTML5 DnD has poor/no touch support on mobile
+    // browsers, and this UI is used from phones. Mouse drags arm
+    // immediately on movement past DRAG_THRESHOLD; touch/pen drags
+    // additionally require a short near-stationary hold first (see
+    // TOUCH_HOLD_MS), so an ordinary swipe-to-scroll on a tile isn't
+    // misread as a drag — if the pointer moves before the hold timer
+    // fires, this bails out entirely and lets the browser's native touch
+    // scrolling take over untouched (no preventDefault was ever called).
+    function attachTileDrag(tile) {
+      tile.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+        if (ev.target.closest('.tile-resize-handle')) return;
+        dragState = {
+          tile, pointerId: ev.pointerId, startX: ev.clientX, startY: ev.clientY,
+          dragging: false, armed: ev.pointerType === 'mouse', lastTarget: null, holdTimer: null,
+        };
+        if (ev.pointerType !== 'mouse') {
+          dragState.holdTimer = setTimeout(() => {
+            if (dragState && dragState.pointerId === ev.pointerId) dragState.armed = true;
+          }, TOUCH_HOLD_MS);
+        }
+      });
+    }
+
+    function reorderDom(sourceTile, targetTile) {
+      const tiles = Array.from(cameraGrid.children);
+      if (tiles.indexOf(sourceTile) < tiles.indexOf(targetTile)) {
+        targetTile.after(sourceTile);
+      } else {
+        targetTile.before(sourceTile);
+      }
+    }
+
+    function syncPisCacheOrderFromDom() {
+      const order = Array.from(cameraGrid.children).map(t => t.dataset.pi);
+      pisCache.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+    }
+
+    window.addEventListener('pointermove', (ev) => {
+      if (!dragState || ev.pointerId !== dragState.pointerId) return;
+      const dx = ev.clientX - dragState.startX;
+      const dy = ev.clientY - dragState.startY;
+      const moved = Math.abs(dx) >= DRAG_THRESHOLD || Math.abs(dy) >= DRAG_THRESHOLD;
+
+      if (!dragState.dragging) {
+        if (!dragState.armed) {
+          if (moved) { clearTimeout(dragState.holdTimer); dragState = null; } // reads as a scroll attempt — bail, don't preventDefault
+          return;
+        }
+        if (!moved) return;
+        dragState.dragging = true;
+        dragState.tile.classList.add('dragging');
+        dragState.tile.setPointerCapture(dragState.pointerId);
+      }
+
+      ev.preventDefault();
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const overTile = el ? el.closest('.camera-tile') : null;
+      if (overTile !== dragState.lastTarget) {
+        if (dragState.lastTarget) dragState.lastTarget.classList.remove('drag-over');
+        if (overTile && overTile !== dragState.tile) overTile.classList.add('drag-over');
+        dragState.lastTarget = overTile;
+      }
+    });
+
+    function endTileDrag(ev) {
+      if (!dragState || ev.pointerId !== dragState.pointerId) return;
+      clearTimeout(dragState.holdTimer);
+      const { tile, lastTarget, dragging } = dragState;
+      if (lastTarget) lastTarget.classList.remove('drag-over');
+      tile.classList.remove('dragging');
+      if (dragging) {
+        // The browser only synthesizes a trailing "click" (which this
+        // flag exists to suppress) if pointerup lands back on the same
+        // element pointerdown started on — after a reorder, it usually
+        // doesn't (the pointer ends up over a different tile, the drop
+        // target), so no click ever arrives to consume the flag. Without
+        // the timeout below, it would stay stuck true and wrongly
+        // swallow the next unrelated, genuine click anywhere in the grid.
+        suppressNextClick = true;
+        setTimeout(() => { suppressNextClick = false; }, 0);
+        if (lastTarget && lastTarget !== tile) {
+          reorderDom(tile, lastTarget);
+          syncPisCacheOrderFromDom();
+          saveGridLayout();
+        }
+      }
+      dragState = null;
+    }
+    window.addEventListener('pointerup', endTileDrag);
+    window.addEventListener('pointercancel', endTileDrag);
+
+    // ── Grid layout: resize-by-drag ─────────────────────────────────────────
+    function attachResizeHandle(handle, tile) {
+      handle.addEventListener('pointerdown', (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        const span = tileSpans.get(tile.dataset.pi) || { colSpan: 1, rowSpan: 1 };
+        resizeState = {
+          tile, pointerId: ev.pointerId, startX: ev.clientX, startY: ev.clientY,
+          startColSpan: span.colSpan, startRowSpan: span.rowSpan,
+          liveColSpan: span.colSpan, liveRowSpan: span.rowSpan,
+        };
+        tile.classList.add('resizing');
+        handle.setPointerCapture(ev.pointerId);
+      });
+      // The browser synthesizes a "click" from the mousedown/mouseup (or
+      // pointer equivalent) pair independently of whether the pointerdown
+      // above stopped propagation — without this, every resize gesture
+      // also bubbled a click up to the tile and opened the drill-down.
+      handle.addEventListener('click', (ev) => { ev.stopPropagation(); });
+    }
+
+    window.addEventListener('pointermove', (ev) => {
+      if (!resizeState || ev.pointerId !== resizeState.pointerId) return;
+      ev.preventDefault();
+      const colWidth = (cameraGrid.clientWidth - GRID_GAP * (gridCols - 1)) / gridCols;
+      const dCol = Math.round((ev.clientX - resizeState.startX) / (colWidth + GRID_GAP));
+      const dRow = Math.round((ev.clientY - resizeState.startY) / (ROW_HEIGHT + GRID_GAP));
+      resizeState.liveColSpan = clampSpan(resizeState.startColSpan + dCol, gridCols);
+      resizeState.liveRowSpan = clampSpan(resizeState.startRowSpan + dRow, MAX_ROW_SPAN);
+      resizeState.tile.style.setProperty('--col-span', resizeState.liveColSpan);
+      resizeState.tile.style.setProperty('--row-span', resizeState.liveRowSpan);
+    });
+
+    function endResize(ev) {
+      if (!resizeState || ev.pointerId !== resizeState.pointerId) return;
+      resizeState.tile.classList.remove('resizing');
+      tileSpans.set(resizeState.tile.dataset.pi, { colSpan: resizeState.liveColSpan, rowSpan: resizeState.liveRowSpan });
+      saveGridLayout();
+      resizeState = null;
+    }
+    window.addEventListener('pointerup', endResize);
+    window.addEventListener('pointercancel', endResize);
+
     // ── Camera grid ───────────────────────────────────────────────────────
     // Each tile proactively checks /status.json for that Pi BEFORE
     // attempting any thumbnail stream — an unreachable Pi shows an
@@ -866,6 +1161,9 @@
       const tile = document.createElement('div');
       tile.className = 'camera-tile';
       tile.dataset.pi = pi.name;
+      const span = tileSpans.get(pi.name) || { colSpan: 1, rowSpan: 1 };
+      tile.style.setProperty('--col-span', span.colSpan);
+      tile.style.setProperty('--row-span', span.rowSpan);
 
       const thumb = document.createElement('div');
       thumb.className = 'thumb';
@@ -884,9 +1182,24 @@
       footer.appendChild(nameSpan);
       footer.appendChild(pillSpan);
 
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'tile-resize-handle';
+      resizeHandle.setAttribute('aria-hidden', 'true');
+      resizeHandle.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#ic-resize"/></svg>';
+      attachResizeHandle(resizeHandle, tile);
+
       tile.appendChild(thumb);
       tile.appendChild(footer);
-      tile.addEventListener('click', () => showDrilldown(pi.name));
+      tile.appendChild(resizeHandle);
+      attachTileDrag(tile);
+      // A plain tap/click (no real drag movement) still opens the
+      // drill-down, exactly as before — suppressNextClick is only ever
+      // set true by endTileDrag, right after a gesture that actually
+      // moved the tile enough to reorder it.
+      tile.addEventListener('click', () => {
+        if (suppressNextClick) { suppressNextClick = false; return; }
+        showDrilldown(pi.name);
+      });
 
       // Operate directly on dotSpan rather than looking it up via
       // getElementById by a constructed id — the previous version did
@@ -949,12 +1262,15 @@
       cameraGrid.innerHTML = '';
       try {
         const resp = await fetch('/pis.json');
-        pisCache = await resp.json();
-        if (pisCache.length === 0) {
+        const pis = await resp.json();
+        if (pis.length === 0) {
+          pisCache = [];
           cameraGrid.innerHTML =
             '<div style="color:var(--text-dim);font-size:13px;">No cameras configured.</div>';
           return;
         }
+        updateGridCols();
+        pisCache = applyGridLayout(pis);
         for (const pi of pisCache) {
           const tile = await buildTile(pi);
           cameraGrid.appendChild(tile);
