@@ -139,7 +139,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &Config{
-		DiscoveryIntervalSecs: r.int("discovery.interval_secs", 10),
+		DiscoveryIntervalSecs: r.int("discovery.interval_secs", 3),
 
 		HTTPPort: r.int("output.http_port", 80),
 		WebDir:   r.str("output.web_dir", "/usr/share/picam-frontend/web"),

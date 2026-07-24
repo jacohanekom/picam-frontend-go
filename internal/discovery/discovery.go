@@ -21,10 +21,13 @@ import (
 // modules, so keep them in sync by hand if this ever changes.
 const ServiceType = "_picam-orchestrator._tcp"
 
-// browseWindow bounds each discovery cycle's zeroconf.Browse call — long
-// enough for backends to reply on a normal LAN, short enough to comfortably
-// fit inside a Run tick interval.
-const browseWindow = 4 * time.Second
+// browseWindow bounds each discovery cycle's zeroconf.Browse call. A
+// responder on a normal LAN answers within well under a second, so this
+// is a safety ceiling more than an expected wait — but every cycle
+// blocks for the full window regardless (there's no early-exit once
+// responses stop arriving), so it directly sets a floor on how quickly
+// a newly-joined Pi can appear.
+const browseWindow = 2 * time.Second
 
 // Run browses for picam-orchestrator backends every intervalSecs,
 // calling onUpdate with the full current set on every cycle (never a
@@ -34,7 +37,7 @@ const browseWindow = 4 * time.Second
 // until ctx is cancelled.
 func Run(ctx context.Context, intervalSecs int, onUpdate func([]config.Backend)) {
 	if intervalSecs <= 0 {
-		intervalSecs = 10
+		intervalSecs = 3
 	}
 	interval := time.Duration(intervalSecs) * time.Second
 

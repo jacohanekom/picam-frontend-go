@@ -78,7 +78,7 @@ Same `config.ini` format as the C++ original (hand-rolled INI parser: `[section]
 
 ```ini
 [discovery]
-interval_secs = 10   ; how often to re-scan the LAN for picam-orchestrator backends
+interval_secs = 3   ; how often to re-scan the LAN for picam-orchestrator backends
 
 [output]
 http_port = 80
@@ -108,7 +108,7 @@ Every response (including errors) carries `Access-Control-Allow-Origin: *`. If `
 
 ### Automatic discovery
 
-`internal/discovery` browses for `_picam-orchestrator._tcp.local.` (mDNS/DNS-SD, via [`libp2p/zeroconf`](https://github.com/libp2p/zeroconf)) every `[discovery].interval_secs` and replaces `relay.Manager`'s backend list wholesale with whatever answered that cycle — a Pi that goes offline or changes IP simply drops out of the very next cycle rather than needing separate expiry tracking. `Manager` starts with zero known backends at process launch; the first browse cycle populates it within a few seconds. See picam-orchestrator-go's README for the advertising side and its `[discovery]` config (name/label).
+`internal/discovery` browses for `_picam-orchestrator._tcp.local.` (mDNS/DNS-SD, via [`libp2p/zeroconf`](https://github.com/libp2p/zeroconf)) every `[discovery].interval_secs` (default 3s, each cycle bounded to a 2s response window) and replaces `relay.Manager`'s backend list wholesale with whatever answered that cycle — a Pi that goes offline or changes IP simply drops out of the very next cycle rather than needing separate expiry tracking. `Manager` starts with zero known backends at process launch; the first browse cycle populates it within a couple of seconds. See picam-orchestrator-go's README for the advertising side and its `[discovery]` config (name/label).
 
 ## Architecture
 

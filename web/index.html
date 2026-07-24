@@ -1560,7 +1560,11 @@
     // the set of known Pis actually changed, refresh: rebuild the grid
     // if it's the active view, or just keep pisCache/sidebar current
     // otherwise so broadcasts (Settings) and the next grid visit see it.
-    const PIS_REFRESH_MS = 15000;
+    // Matched to picam-frontend's own default discovery interval (~5s
+    // worst case: 3s poll + up to a 2s response window) -- polling much
+    // faster than the backend's own list can change wouldn't surface
+    // anything sooner.
+    const PIS_REFRESH_MS = 5000;
 
     async function refreshPisIfChanged() {
       try {
