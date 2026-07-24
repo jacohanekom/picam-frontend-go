@@ -14,16 +14,9 @@ import (
 	"strings"
 )
 
-type entry struct {
-	section, key, value string
-}
-
-// rawStore is the parsed file: a flat "section.key" -> value map for
-// ordinary lookups, plus the entries in file order for [pis] (which has
-// an arbitrary, unknown-in-advance number of keys — one per configured Pi).
+// rawStore is the parsed file: a flat "section.key" -> value map.
 type rawStore struct {
-	byKey   map[string]string
-	entries []entry
+	byKey map[string]string
 }
 
 func parseFile(path string) (*rawStore, error) {
@@ -63,7 +56,6 @@ func parseFile(path string) (*rawStore, error) {
 			continue
 		}
 
-		store.entries = append(store.entries, entry{section, key, val})
 		fullKey := key
 		if section != "" {
 			fullKey = section + "." + key
@@ -113,20 +105,10 @@ func (r *rawStore) int(key string, def int) int {
 	return n
 }
 
-// section returns every key/value pair under [name], in file order.
-func (r *rawStore) section(name string) []entry {
-	var out []entry
-	for _, e := range r.entries {
-		if e.section == name {
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-// Backend is one configured picam-orchestrator instance this frontend can
+// Backend is one known picam-orchestrator instance this frontend can
 // show: a short name (used in ?pi=NAME and internally), a display label,
-// and the host:port to reach it.
+// and the host:port to reach it. Populated at runtime by
+// internal/discovery, not read from config — see Config.DiscoveryIntervalSecs.
 type Backend struct {
 	Name  string
 	Label string
@@ -136,8 +118,8 @@ type Backend struct {
 
 // Config holds every setting picam-frontend needs, parsed once at startup.
 type Config struct {
-	// [pis]
-	Backends []Backend
+	// [discovery]
+	DiscoveryIntervalSecs int
 
 	// [output]
 	HTTPPort int
@@ -156,37 +138,8 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
-	var backends []Backend
-	for _, e := range r.section("pis") {
-		b := Backend{Name: e.key, Port: 81}
-
-		rest := e.value
-		hostPort := rest
-		if comma := strings.IndexByte(rest, ','); comma >= 0 {
-			hostPort = rest[:comma]
-			b.Label = strings.TrimSpace(rest[comma+1:])
-		}
-		if b.Label == "" {
-			b.Label = b.Name
-		}
-
-		if colon := strings.IndexByte(hostPort, ':'); colon >= 0 {
-			b.Host = hostPort[:colon]
-			if p, err := strconv.Atoi(hostPort[colon+1:]); err == nil {
-				b.Port = p
-			}
-		} else {
-			// No :port — 81 is picam-orchestrator's own default port,
-			// not picam-frontend's; an unqualified [pis] entry assumes
-			// the backend is running with its own default.
-			b.Host = hostPort
-		}
-
-		backends = append(backends, b)
-	}
-
 	return &Config{
-		Backends: backends,
+		DiscoveryIntervalSecs: r.int("discovery.interval_secs", 10),
 
 		HTTPPort: r.int("output.http_port", 80),
 		WebDir:   r.str("output.web_dir", "/usr/share/picam-frontend/web"),

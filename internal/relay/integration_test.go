@@ -182,7 +182,6 @@ func TestRelayEndToEnd(t *testing.T) {
 	pi := config.Backend{Name: "test", Label: "Test", Host: u.Hostname(), Port: port}
 
 	cfg := &config.Config{
-		Backends:   []config.Backend{pi},
 		ICEPortMin: 51000,
 		ICEPortMax: 51100,
 	}
@@ -191,6 +190,7 @@ func TestRelayEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer m.Close()
+	m.SetBackends([]config.Backend{pi})
 
 	// First viewer establishes the upstream relay.
 	browser1, recv1 := fakeBrowser(t, m, pi, "main")

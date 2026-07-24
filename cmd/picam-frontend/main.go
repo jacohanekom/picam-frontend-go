@@ -1,9 +1,10 @@
 // Command picam-frontend is a Go port of the C++ picam-frontend service:
 // a single web UI for viewing one or more picam-orchestrator backends
-// (each running on its own Pi). Reads a static list of Pi addresses from
-// config, serves the browser page, and proxies status JSON + WebRTC media
-// from whichever Pi+stream the viewer has selected — the browser only ever
-// talks to this one process, never directly to a Pi.
+// (each running on its own Pi). Discovers Pi addresses automatically via
+// mDNS (see internal/discovery), serves the browser page, and proxies
+// status JSON + WebRTC media from whichever Pi+stream the viewer has
+// selected — the browser only ever talks to this one process, never
+// directly to a Pi.
 //
 // WebRTC media is peer-to-peer by nature, which would otherwise break that
 // "browser only ever talks to picam-frontend" guarantee — so this process
@@ -30,6 +31,7 @@ import (
 
 	"picam-frontend/internal/backendhttp"
 	"picam-frontend/internal/config"
+	"picam-frontend/internal/discovery"
 	"picam-frontend/internal/httpsrv"
 	"picam-frontend/internal/relay"
 )
@@ -55,6 +57,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("[Relay] %v", err)
 	}
+	go discovery.Run(ctx, cfg.DiscoveryIntervalSecs, rel.SetBackends)
 
 	srv := httpsrv.New(cfg.HTTPPort, cfg.WebDir, rel, client)
 	srv.Start()
@@ -75,15 +78,9 @@ func main() {
 }
 
 func logConfig(cfg *config.Config) {
-	log.Printf("[Config] viewer : http://0.0.0.0:%d", cfg.HTTPPort)
-	log.Printf("[Config] webrtc : ice ports %d-%d", cfg.ICEPortMin, cfg.ICEPortMax)
-	log.Printf("[Config] pis    : %d configured", len(cfg.Backends))
-	for _, b := range cfg.Backends {
-		log.Printf("  - %s (%s) -> %s:%d", b.Name, b.Label, b.Host, b.Port)
-	}
-	if len(cfg.Backends) == 0 {
-		log.Printf("[Config] WARNING: no [pis] entries configured — add at least one to /etc/picam-frontend/config.ini")
-	}
+	log.Printf("[Config] viewer    : http://0.0.0.0:%d", cfg.HTTPPort)
+	log.Printf("[Config] webrtc    : ice ports %d-%d", cfg.ICEPortMin, cfg.ICEPortMax)
+	log.Printf("[Config] discovery : interval=%ds, browsing for %s.local.", cfg.DiscoveryIntervalSecs, discovery.ServiceType)
 }
 
 func portSuffix(port int) string {

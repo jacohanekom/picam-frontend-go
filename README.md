@@ -74,14 +74,11 @@ Then open `http://localhost` (or whatever `output.http_port` is set to) in a bro
 
 ## Configuration
 
-Same `config.ini` format and defaults as the C++ original (hand-rolled INI parser: `[section]` headers, `key = value` pairs, `;`/`#` comments). See [`config.ini`](config.ini) in this directory for the full annotated file.
+Same `config.ini` format as the C++ original (hand-rolled INI parser: `[section]` headers, `key = value` pairs, `;`/`#` comments). See [`config.ini`](config.ini) in this directory for the full annotated file.
 
 ```ini
-[pis]
-# Format: name = host[:port][, Display Label]
-# Default port: 81 (picam-orchestrator's default)
-front = 10.10.0.50,Front Yard
-back  = 10.10.0.51,Back Yard
+[discovery]
+interval_secs = 10   ; how often to re-scan the LAN for picam-orchestrator backends
 
 [output]
 http_port = 80
@@ -92,12 +89,14 @@ ice_port_min = 50000     ; port range for both relay legs (upstream-to-Pi, downs
 ice_port_max = 50200
 ```
 
+picam-orchestrator backends are **not** listed in this file — `internal/discovery` finds them automatically over mDNS/DNS-SD (see below), one browse cycle every `interval_secs`. There is no manual host list to keep in sync as Pis are added, replaced, or get new IPs.
+
 ## HTTP Endpoints
 
 | Endpoint | Description |
 |---|---|
 | `GET /` | Serves `index.html` |
-| `GET /pis.json` | JSON array of configured Pi objects (`{"name":...,"label":...}`) |
+| `GET /pis.json` | JSON array of currently-discovered Pi objects (`{"name":...,"label":...}`) — reflects live mDNS discovery, not a static list (see Automatic discovery below) |
 | `POST /webrtc/offer?pi=X&stream=main\|lores` | WHEP-style signaling for a browser viewer — body `{"sdp":"..."}` (SDP offer), response `{"sdp":"..."}` (SDP answer). Media then flows over the resulting WebRTC connection, relayed from Pi X. `main` requests are adaptive (see Architecture) — the browser never chooses `main-high`/`main-low` directly. |
 | `GET /status.json?pi=X` | Proxied telemetry JSON from Pi X |
 | `GET /camera?pi=X&id=N` | Switch camera lens on Pi X |
@@ -105,7 +104,11 @@ ice_port_max = 50200
 | `GET /osd?pi=X&camera_id=true\|false&time=true\|false` | Toggle OSD overlays |
 | `GET /annotate?pi=X&main=true\|false&lores=true\|false` | Toggle annotation |
 
-Every response (including errors) carries `Access-Control-Allow-Origin: *`. If `?pi=` is omitted, the first configured Pi is used.
+Every response (including errors) carries `Access-Control-Allow-Origin: *`. If `?pi=` is omitted, the first known Pi is used.
+
+### Automatic discovery
+
+`internal/discovery` browses for `_picam-orchestrator._tcp.local.` (mDNS/DNS-SD, via [`libp2p/zeroconf`](https://github.com/libp2p/zeroconf)) every `[discovery].interval_secs` and replaces `relay.Manager`'s backend list wholesale with whatever answered that cycle — a Pi that goes offline or changes IP simply drops out of the very next cycle rather than needing separate expiry tracking. `Manager` starts with zero known backends at process launch; the first browse cycle populates it within a few seconds. See picam-orchestrator-go's README for the advertising side and its `[discovery]` config (name/label).
 
 ## Architecture
 
@@ -120,6 +123,7 @@ Browser ──── HTTP ─────► picam-frontend (this) ──── 
 | Package | Responsibility |
 |---|---|
 | `internal/config` | INI config parsing into a typed `Config` struct |
+| `internal/discovery` | mDNS/DNS-SD browsing for picam-orchestrator backends |
 | `internal/backendhttp` | Shared `net/http` client for proxying requests to a picam-orchestrator backend |
 | `internal/relay` | The WebRTC SFU-lite relay: one upstream `PeerConnection` per (Pi, stream), fanned out to per-browser downstream `PeerConnection`s |
 | `internal/httpsrv` | Browser-facing HTTP server: static UI, proxy routes, WHEP signaling handoff to `internal/relay` |

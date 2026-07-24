@@ -37,20 +37,23 @@ type relayKey struct {
 	stream string
 }
 
-// Manager owns every configured backend, the shared WebRTC API (ICE port
+// Manager owns every known backend, the shared WebRTC API (ICE port
 // range, no STUN/TURN — both relay legs are LAN-only, or relayed through
 // this process), and the set of currently-live upstream relays.
 type Manager struct {
+	api    *webrtc.API
+	client *backendhttp.Client
+
+	bmu      sync.RWMutex // guards backends only — read on every request, must never block behind upstream network I/O
 	backends []config.Backend
-	api      *webrtc.API
-	client   *backendhttp.Client
 
 	mu        sync.Mutex // guards upstreams; see getOrCreateUpstream/removeViewer for the tradeoff of holding it across network I/O
 	upstreams map[relayKey]*upstream
 }
 
-// New builds a Manager. It does not contact any backend until the first
-// browser subscribes.
+// New builds a Manager with no known backends yet — they arrive
+// asynchronously from internal/discovery via SetBackends. It does not
+// contact any backend until the first browser subscribes.
 func New(cfg *config.Config, client *backendhttp.Client) (*Manager, error) {
 	se := webrtc.SettingEngine{}
 	if err := se.SetEphemeralUDPPortRange(uint16(cfg.ICEPortMin), uint16(cfg.ICEPortMax)); err != nil {
@@ -64,15 +67,24 @@ func New(cfg *config.Config, client *backendhttp.Client) (*Manager, error) {
 	api := webrtc.NewAPI(webrtc.WithSettingEngine(se))
 
 	return &Manager{
-		backends:  cfg.Backends,
 		api:       api,
 		client:    client,
 		upstreams: map[relayKey]*upstream{},
 	}, nil
 }
 
-// FindBackend looks up a configured Pi by its short name.
+// SetBackends replaces the full set of known backends — called by
+// internal/discovery after every mDNS browse cycle.
+func (m *Manager) SetBackends(backends []config.Backend) {
+	m.bmu.Lock()
+	m.backends = backends
+	m.bmu.Unlock()
+}
+
+// FindBackend looks up a known Pi by its short name.
 func (m *Manager) FindBackend(name string) (config.Backend, bool) {
+	m.bmu.RLock()
+	defer m.bmu.RUnlock()
 	for _, b := range m.backends {
 		if b.Name == name {
 			return b, true
@@ -81,17 +93,21 @@ func (m *Manager) FindBackend(name string) (config.Backend, bool) {
 	return config.Backend{}, false
 }
 
-// DefaultBackend returns the first configured Pi, used whenever a request
+// DefaultBackend returns the first known Pi, used whenever a request
 // omits ?pi= — matches the C++ original's fallback.
 func (m *Manager) DefaultBackend() (config.Backend, bool) {
+	m.bmu.RLock()
+	defer m.bmu.RUnlock()
 	if len(m.backends) == 0 {
 		return config.Backend{}, false
 	}
 	return m.backends[0], true
 }
 
-// Backends returns every configured Pi, in config-file order.
+// Backends returns every currently known Pi.
 func (m *Manager) Backends() []config.Backend {
+	m.bmu.RLock()
+	defer m.bmu.RUnlock()
 	return m.backends
 }
 

@@ -1328,7 +1328,7 @@
           pisCache = [];
           renderSidebarCameraList(pisCache);
           cameraGrid.innerHTML =
-            '<div style="color:var(--text-dim);font-size:13px;">No cameras configured.</div>';
+            '<div style="color:var(--text-dim);font-size:13px;">No cameras found yet — still discovering on the LAN.</div>';
           return;
         }
         updateGridCols();
@@ -1542,6 +1542,33 @@
       }
     }
     setInterval(settingsPollTick, SETTINGS_POLL_MS);
+
+    // pisCache used to be populated once from a static config list; now
+    // it's mDNS-discovered on picam-frontend and can change while this
+    // page is open (a Pi joins/leaves the LAN). Poll /pis.json and, if
+    // the set of known Pis actually changed, refresh: rebuild the grid
+    // if it's the active view, or just keep pisCache/sidebar current
+    // otherwise so broadcasts (Settings) and the next grid visit see it.
+    const PIS_REFRESH_MS = 15000;
+
+    async function refreshPisIfChanged() {
+      try {
+        const resp = await fetch('/pis.json');
+        const pis = await resp.json();
+        const before = pisCache.map(p => p.name).sort().join(',');
+        const after = pis.map(p => p.name).sort().join(',');
+        if (before === after) return;
+        if (inDrilldown || inSettings) {
+          pisCache = pis;
+          renderSidebarCameraList(pisCache);
+        } else {
+          loadCameraGrid();
+        }
+      } catch (e) {
+        // transient — retried next tick
+      }
+    }
+    setInterval(refreshPisIfChanged, PIS_REFRESH_MS);
 
     // ── Startup ───────────────────────────────────────────────────────────
     if (currentPi) {

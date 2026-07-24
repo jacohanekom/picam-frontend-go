@@ -3,6 +3,7 @@ module picam-frontend
 go 1.26.4
 
 require (
+	github.com/libp2p/zeroconf/v2 v2.2.0
 	github.com/pion/rtcp v1.2.17
 	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.16
