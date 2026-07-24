@@ -818,6 +818,34 @@
               <input type="number" id="luxThresholdInput" min="0" step="1">
             </div>
           </div>
+
+          <!-- Infrared light: same shape as Auto camera switch above --
+               the relay decision runs on each Pi's own picam-orchestrator
+               (via pi-relay-control, running locally on that Pi), this is
+               only the remote control. Threshold/max-on-minutes are
+               shared, but each Pi reads its own lux and switches its own
+               relay. -->
+          <div class="settings-group">
+            <span class="group-label">Infrared Light</span>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-sun"/></svg>
+                Enabled
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="irLightToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="lux-threshold-row">
+              <label for="irLightThresholdInput">Threshold (lux)</label>
+              <input type="number" id="irLightThresholdInput" min="0" step="1">
+            </div>
+            <div class="lux-threshold-row">
+              <label for="irLightMaxOnInput">Max on time (min)</label>
+              <input type="number" id="irLightMaxOnInput" min="0" step="1">
+            </div>
+          </div>
         </div>
       </div>
 
@@ -855,6 +883,9 @@
     const annotateLoresToggle = document.getElementById('annotateLoresToggle');
     const luxSwitchToggle = document.getElementById('luxSwitchToggle');
     const luxThresholdInput = document.getElementById('luxThresholdInput');
+    const irLightToggle = document.getElementById('irLightToggle');
+    const irLightThresholdInput = document.getElementById('irLightThresholdInput');
+    const irLightMaxOnInput = document.getElementById('irLightMaxOnInput');
 
     // Track which Pi the drill-down view is watching — sent as a query
     // param to /webrtc/offer so the frontend knows which backend to
@@ -1516,6 +1547,9 @@
       osdTimeToggle.disabled = !available;
       luxSwitchToggle.disabled = !available;
       luxThresholdInput.disabled = !available;
+      irLightToggle.disabled = !available;
+      irLightThresholdInput.disabled = !available;
+      irLightMaxOnInput.disabled = !available;
       updateLensDisabled(luxSwitchToggle.checked);
     }
 
@@ -1544,6 +1578,27 @@
       if (value === '') return;
       Promise.all(pisCache.map(pi =>
         fetch('/lux-switch?pi=' + encodeURIComponent(pi.name) + '&threshold=' + encodeURIComponent(value)).catch(() => {})
+      ));
+    });
+
+    // ── Infrared light: same remote-control shape as Auto camera switch
+    // above -- the relay decision runs on each Pi's own picam-orchestrator
+    // (via pi-relay-control, running locally on that Pi), independent of
+    // the camera-lens auto-switch. Threshold/max-on-minutes are shared,
+    // but each Pi reads its own lux and switches its own relay.
+    wireToggleGlobal(irLightToggle, '/ir-light', 'enabled');
+    irLightThresholdInput.addEventListener('change', () => {
+      const value = irLightThresholdInput.value;
+      if (value === '') return;
+      Promise.all(pisCache.map(pi =>
+        fetch('/ir-light?pi=' + encodeURIComponent(pi.name) + '&threshold=' + encodeURIComponent(value)).catch(() => {})
+      ));
+    });
+    irLightMaxOnInput.addEventListener('change', () => {
+      const value = irLightMaxOnInput.value;
+      if (value === '') return;
+      Promise.all(pisCache.map(pi =>
+        fetch('/ir-light?pi=' + encodeURIComponent(pi.name) + '&max_on_minutes=' + encodeURIComponent(value)).catch(() => {})
       ));
     });
 
@@ -1616,6 +1671,17 @@
       if (typeof data.lux_switch_threshold === 'number' && document.activeElement !== luxThresholdInput) {
         luxThresholdInput.value = data.lux_switch_threshold;
       }
+
+      if (typeof data.ir_light_enabled === 'boolean' && document.activeElement !== irLightToggle) {
+        irLightToggle.checked = data.ir_light_enabled;
+      }
+      if (typeof data.ir_light_threshold === 'number' && document.activeElement !== irLightThresholdInput) {
+        irLightThresholdInput.value = data.ir_light_threshold;
+      }
+      if (typeof data.ir_light_max_on_minutes === 'number' && document.activeElement !== irLightMaxOnInput) {
+        irLightMaxOnInput.value = data.ir_light_max_on_minutes;
+      }
+
       // While auto-switch is on, different Pis can legitimately be on
       // different lenses at once -- a single shared control can't
       // represent that truthfully, so it's disabled instead of synced.

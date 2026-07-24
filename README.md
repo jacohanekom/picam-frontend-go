@@ -101,6 +101,7 @@ picam-orchestrator backends are **not** listed in this file — `internal/discov
 | `GET /status.json?pi=X` | Proxied telemetry JSON from Pi X |
 | `GET /camera?pi=X&id=N` | Switch camera lens on Pi X |
 | `GET /lux-switch?pi=X&enabled=true\|false&threshold=N` | Configure Pi X's automatic lens switching by ambient light — the switch decision itself runs on picam-orchestrator, not here; see that project's README |
+| `GET /ir-light?pi=X&enabled=true\|false&threshold=N&max_on_minutes=N` | Configure Pi X's automatic IR-light relay control by ambient light — the relay decision itself runs on picam-orchestrator via pi-relay-control, not here; see that project's README |
 | `GET /osd?pi=X&camera_id=true\|false&time=true\|false` | Toggle OSD overlays |
 | `GET /annotate?pi=X&main=true\|false&lores=true\|false` | Toggle annotation |
 

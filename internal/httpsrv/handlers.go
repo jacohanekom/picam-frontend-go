@@ -18,6 +18,7 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("GET /annotate", s.handleAnnotate)
 	mux.HandleFunc("GET /camera", s.handleCamera)
 	mux.HandleFunc("GET /lux-switch", s.handleLuxSwitch)
+	mux.HandleFunc("GET /ir-light", s.handleIRLight)
 	mux.HandleFunc("POST /webrtc/offer", s.handleOffer)
 	mux.HandleFunc("GET /", s.handleIndex)
 }
@@ -118,4 +119,9 @@ func (s *Server) handleCamera(w http.ResponseWriter, r *http.Request) {
 // handleLuxSwitch implements GET /lux-switch?pi=X&enabled=<bool>&threshold=<int>.
 func (s *Server) handleLuxSwitch(w http.ResponseWriter, r *http.Request) {
 	s.proxyGet(w, r, "/lux-switch", []string{"enabled", "threshold"})
+}
+
+// handleIRLight implements GET /ir-light?pi=X&enabled=<bool>&threshold=<int>&max_on_minutes=<int>.
+func (s *Server) handleIRLight(w http.ResponseWriter, r *http.Request) {
+	s.proxyGet(w, r, "/ir-light", []string{"enabled", "threshold", "max_on_minutes"})
 }
