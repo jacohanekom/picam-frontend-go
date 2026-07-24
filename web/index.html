@@ -242,6 +242,10 @@
     outline: none;
     border-color: var(--accent);
   }
+  .lux-threshold-row input[type="number"]:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
   .status-pill {
     display: inline-flex;
     align-items: center;
@@ -940,6 +944,7 @@
         sidebarCameraList.appendChild(btn);
       }
       updateSidebarActive();
+      updateSettingsAvailability();
     }
 
     // Highlights whichever sidebar shortcut matches the camera currently
@@ -1442,19 +1447,43 @@
     wireToggleGlobal(osdCameraToggle, '/osd', 'camera_id');
     wireToggleGlobal(osdTimeToggle, '/osd', 'time');
 
+    // Broadcasting/toggling a setting is meaningless with zero
+    // discovered Pis to send it to, so every Settings control is
+    // disabled until at least one is known. Called whenever pisCache
+    // changes (see renderSidebarCameraList) and once at startup, so
+    // controls start disabled rather than flashing enabled before the
+    // first discovery cycle resolves.
+    function updateSettingsAvailability() {
+      const available = pisCache.length > 0;
+      annotateMainToggle.disabled = !available;
+      annotateLoresToggle.disabled = !available;
+      osdCameraToggle.disabled = !available;
+      osdTimeToggle.disabled = !available;
+      luxSwitchToggle.disabled = !available;
+      luxThresholdInput.disabled = !available;
+      updateLensDisabled(luxSwitchToggle.checked);
+    }
+
+    // Lens select is disabled either while auto camera switch is on
+    // (different Pis can legitimately be on different lenses at once,
+    // so a single shared control can't represent that truthfully) or
+    // while there are no discovered Pis to switch at all.
+    function updateLensDisabled(luxOn) {
+      cameraSelect.disabled = luxOn || pisCache.length === 0;
+    }
+
     // ── Auto camera switch: the actual lux-crossing decision runs on
     // each Pi's own picam-orchestrator (internal/luxswitch) -- this is
     // only the remote control that configures it. Threshold is shared
     // across every Pi, but each Pi reads its own lux and switches its
-    // own lens independently. While enabled, the manual Lens select is
-    // disabled -- different Pis can legitimately be on different
-    // lenses at once under auto mode, so a single shared control
-    // can't represent that truthfully, and a manual change would just
-    // get overridden by the orchestrator's own next evaluation anyway.
+    // own lens independently. A manual change while auto-switch is on
+    // would just get overridden by the orchestrator's own next
+    // evaluation anyway -- see updateLensDisabled above.
     wireToggleGlobal(luxSwitchToggle, '/lux-switch', 'enabled');
     luxSwitchToggle.addEventListener('change', () => {
-      cameraSelect.disabled = luxSwitchToggle.checked;
+      updateLensDisabled(luxSwitchToggle.checked);
     });
+    updateSettingsAvailability();
     luxThresholdInput.addEventListener('change', () => {
       const value = luxThresholdInput.value;
       if (value === '') return;
@@ -1535,7 +1564,7 @@
       // While auto-switch is on, different Pis can legitimately be on
       // different lenses at once -- a single shared control can't
       // represent that truthfully, so it's disabled instead of synced.
-      cameraSelect.disabled = !!luxEnabled;
+      updateLensDisabled(!!luxEnabled);
       const t = data.telemetry || {};
       if (!luxEnabled && typeof t.active_camera === 'number') {
         setActiveCamera(t.active_camera);
