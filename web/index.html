@@ -87,6 +87,11 @@
     background: var(--accent-bg);
     color: var(--accent);
   }
+  .nav-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+  }
   /* Per-camera shortcuts, listed under the "Cameras" nav item — each
      jumps straight to that camera's drill-down view. */
   #sidebarCameraList {
@@ -507,6 +512,45 @@
     min-height: 200px;
   }
   .loading-overlay.hidden { display: none; }
+
+  /* Full-app blocking overlay for the "zero cameras discovered" state
+     -- sits above the sidebar too (unlike .loading-overlay, which only
+     covers the drill-down viewer), so nothing else is selectable while
+     it's showing. */
+  .no-cameras-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 22, 26, 0.95); /* --bg, with opacity */
+  }
+  .no-cameras-overlay.hidden { display: none; }
+  .no-cameras-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: 320px;
+    padding: 32px;
+    text-align: center;
+  }
+  .no-cameras-card .icon {
+    width: 40px;
+    height: 40px;
+    color: var(--danger);
+  }
+  .no-cameras-card h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 500;
+  }
+  .no-cameras-card p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
   .spinner {
     width: 22px;
     height: 22px;
@@ -611,6 +655,19 @@
     <svg class="icon" aria-hidden="true"><use href="#ic-menu-2"/></svg>
   </button>
   <div class="overlay-bg" id="overlayBg"></div>
+
+  <!-- Blocks the entire app -- sidebar included -- while zero cameras
+       are known. There's nothing to view or configure with no
+       discovered Pis, so navigating anywhere else would just land on
+       an empty grid or an all-disabled Settings page; this makes that
+       state unmistakable instead. -->
+  <div class="no-cameras-overlay hidden" id="noCamerasOverlay">
+    <div class="no-cameras-card">
+      <svg class="icon" aria-hidden="true"><use href="#ic-alert-triangle"/></svg>
+      <h2>No cameras found</h2>
+      <p>Searching the network for picam-orchestrator devices…</p>
+    </div>
+  </div>
 
   <div class="layout">
     <aside class="sidebar" id="sidebar">
@@ -773,6 +830,7 @@
     const sidebar    = document.getElementById('sidebar');
     const overlayBg   = document.getElementById('overlayBg');
     const menuToggle  = document.getElementById('menuToggle');
+    const noCamerasOverlay = document.getElementById('noCamerasOverlay');
     const navCameras  = document.getElementById('navCameras');
     const navSettings = document.getElementById('navSettings');
     const sidebarCameraList = document.getElementById('sidebarCameraList');
@@ -930,6 +988,7 @@
       }
       updateSidebarActive();
       updateSettingsAvailability();
+      updateNoCamerasOverlay();
     }
 
     // Highlights whichever sidebar shortcut matches the camera currently
@@ -1431,6 +1490,19 @@
     wireToggleGlobal(annotateLoresToggle, '/annotate', 'lores');
     wireToggleGlobal(osdCameraToggle, '/osd', 'camera_id');
     wireToggleGlobal(osdTimeToggle, '/osd', 'time');
+
+    // Blocks the whole app (see .no-cameras-overlay) whenever zero
+    // cameras are known -- there's nothing to view or configure yet.
+    // Also disables the top-level nav buttons directly rather than
+    // relying solely on the overlay's z-index to block clicks, so
+    // they're not reachable by keyboard/tab navigation either. Called
+    // whenever pisCache changes (see renderSidebarCameraList).
+    function updateNoCamerasOverlay() {
+      const found = pisCache.length > 0;
+      noCamerasOverlay.classList.toggle('hidden', found);
+      navCameras.disabled = !found;
+      navSettings.disabled = !found;
+    }
 
     // Broadcasting/toggling a setting is meaningless with zero
     // discovered Pis to send it to, so every Settings control is
