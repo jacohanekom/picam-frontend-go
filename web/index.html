@@ -505,10 +505,18 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Sidebar Settings: Lens/Annotate/Overlay/Auto-switch groups, each a
+  /* Settings page: Lens/Annotate/Overlay/Auto-switch groups, each a
      small uppercase label + its controls, stacked with a divider
-     between groups (same idea as the old bottom-bar's row groups, just
-     vertical to fit the sidebar's width). */
+     between groups. Constrained to a narrow column even though the
+     page itself has the full content area to work with -- a settings
+     list reads better narrow than stretched full-width. */
+  .settings-page {
+    max-width: 420px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px 16px;
+  }
   .group-label {
     font-size: 11px;
     font-weight: 500;
@@ -521,7 +529,7 @@
     margin-bottom: 4px;
   }
   .settings-group {
-    padding: 10px 0;
+    padding: 14px 0;
   }
   .settings-group + .settings-group {
     border-top: 1px solid var(--border);
@@ -587,6 +595,7 @@
     <symbol id="ic-alert-triangle" viewBox="0 0 24 24"><path d="M12 9v4" /> <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.871l-8.106 -13.534a1.914 1.914 0 0 0 -3.274 0z" /> <path d="M12 16h.01" /></symbol>
     <symbol id="ic-arrow-left" viewBox="0 0 24 24"><path d="M5 12l14 0" /> <path d="M5 12l6 6" /> <path d="M5 12l6 -6" /></symbol>
     <symbol id="ic-resize" viewBox="0 0 24 24"><path d="M16 20l4 -4" /> <path d="M4 20l16 -16" /></symbol>
+    <symbol id="ic-settings" viewBox="0 0 24 24"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /> <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></symbol>
   </svg>
 
   <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
@@ -614,80 +623,16 @@
         </nav>
       </div>
 
-      <!-- Settings: global, applies to every configured Pi immediately
-           (not scoped to whichever camera is currently drilled into). -->
+      <!-- Settings: its own page (see #settingsView) -- global, applies
+           to every configured Pi immediately, not scoped to whichever
+           camera is currently drilled into. -->
       <div>
         <div class="section-label">Settings</div>
-
-        <div class="settings-group">
-          <span class="group-label">Lens</span>
-          <nav class="stream-nav vertical" id="cameraNav">
-            <button class="stream-btn" id="btn-cam0" data-camera="0">
-              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 0
-            </button>
-            <button class="stream-btn" id="btn-cam1" data-camera="1">
-              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 1
-            </button>
-          </nav>
-        </div>
-
-        <div class="settings-group">
-          <span class="group-label">Annotate</span>
-          <nav class="stream-nav vertical" id="annotateNav">
-            <button class="stream-btn" id="btn-annotate-main" data-resolution="main">
-              <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Main
-            </button>
-            <button class="stream-btn" id="btn-annotate-lores" data-resolution="lores">
-              <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Lores
-            </button>
-          </nav>
-        </div>
-
-        <div class="settings-group">
-          <span class="group-label">Overlay</span>
-          <div class="toggle-row">
-            <span class="toggle-label">
-              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>
-              Camera ID
-            </span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="osdCameraToggle">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="toggle-row">
-            <span class="toggle-label">
-              <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
-              Time
-            </span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="osdTimeToggle">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Auto camera switch: the switch decision itself runs on each
-             Pi's own picam-orchestrator (see that project's README) --
-             this is only the remote control. Threshold is shared, but
-             each Pi reads its own lux and switches its own lens. -->
-        <div class="settings-group">
-          <span class="group-label">Auto camera switch</span>
-          <div class="toggle-row">
-            <span class="toggle-label">
-              <svg class="icon" aria-hidden="true"><use href="#ic-sun"/></svg>
-              Enabled
-            </span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="luxSwitchToggle">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="lux-threshold-row">
-            <label for="luxThresholdInput">Threshold (lux)</label>
-            <input type="number" id="luxThresholdInput" min="0" step="1">
-          </div>
-        </div>
+        <nav class="stream-nav vertical">
+          <button class="nav-btn" id="navSettings">
+            <svg class="icon" aria-hidden="true"><use href="#ic-settings"/></svg>Settings
+          </button>
+        </nav>
       </div>
     </aside>
 
@@ -729,6 +674,87 @@
         </div>
       </div>
 
+      <!-- ══════════════════ Settings page ══════════════════ -->
+      <!-- Global -- every control here applies to all configured Pis
+           immediately, not scoped to any one camera. -->
+      <div id="settingsView" style="display:none;">
+        <div class="content-header">
+          <h1>Settings</h1>
+        </div>
+
+        <div class="settings-page">
+          <div class="settings-group">
+            <span class="group-label">Lens</span>
+            <nav class="stream-nav vertical" id="cameraNav">
+              <button class="stream-btn" id="btn-cam0" data-camera="0">
+                <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 0
+              </button>
+              <button class="stream-btn" id="btn-cam1" data-camera="1">
+                <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 1
+              </button>
+            </nav>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-label">Annotate</span>
+            <nav class="stream-nav vertical" id="annotateNav">
+              <button class="stream-btn" id="btn-annotate-main" data-resolution="main">
+                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Main
+              </button>
+              <button class="stream-btn" id="btn-annotate-lores" data-resolution="lores">
+                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Lores
+              </button>
+            </nav>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-label">Overlay</span>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>
+                Camera ID
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="osdCameraToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
+                Time
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="osdTimeToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Auto camera switch: the switch decision itself runs on each
+               Pi's own picam-orchestrator (see that project's README) --
+               this is only the remote control. Threshold is shared, but
+               each Pi reads its own lux and switches its own lens. -->
+          <div class="settings-group">
+            <span class="group-label">Auto camera switch</span>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-sun"/></svg>
+                Enabled
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="luxSwitchToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="lux-threshold-row">
+              <label for="luxThresholdInput">Threshold (lux)</label>
+              <input type="number" id="luxThresholdInput" min="0" step="1">
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
   </div>
   <script>
@@ -737,10 +763,12 @@
     const overlayBg   = document.getElementById('overlayBg');
     const menuToggle  = document.getElementById('menuToggle');
     const navCameras  = document.getElementById('navCameras');
+    const navSettings = document.getElementById('navSettings');
     const sidebarCameraList = document.getElementById('sidebarCameraList');
 
     const gridView      = document.getElementById('gridView');
     const drilldownView = document.getElementById('drilldownView');
+    const settingsView  = document.getElementById('settingsView');
     const cameraGrid    = document.getElementById('cameraGrid');
     const resetLayoutBtn = document.getElementById('resetLayoutBtn');
     const backBtn       = document.getElementById('backBtn');
@@ -774,6 +802,7 @@
     let slowHintTimer = null;
     let pisCache = [];          // last loaded /pis.json result
     let inDrilldown = false;
+    let inSettings = false;
 
     // WebRTC connections. Unlike the old <img src="/stream">, each
     // viewer (grid tile, drill-down) is a real RTCPeerConnection that
@@ -893,23 +922,35 @@
     }
 
     // Highlights whichever sidebar shortcut matches the camera currently
-    // drilled into, and "Cameras" itself only while on the grid — the
-    // two are mutually exclusive, never both highlighted at once.
+    // drilled into, "Cameras" itself only while on the grid, and
+    // "Settings" only on the settings page — all mutually exclusive,
+    // never more than one highlighted at once.
     function updateSidebarActive() {
-      navCameras.classList.toggle('active', !inDrilldown);
+      navCameras.classList.toggle('active', !inDrilldown && !inSettings);
+      navSettings.classList.toggle('active', inSettings);
       sidebarCameraList.querySelectorAll('.nav-btn-sub').forEach((btn) => {
         btn.classList.toggle('active', inDrilldown && btn.dataset.pi === currentPi);
       });
     }
 
-    // ── View switching: grid <-> drill-down ──────────────────────────────
-    function showGrid() {
-      inDrilldown = false;
+    // Tears down the drill-down's live WebRTC connection and fullscreen
+    // state — shared by any navigation away from the drill-down view
+    // (to the grid or to Settings), since neither of those keeps the
+    // stream connection alive.
+    function leaveDrilldown() {
       drilldownView.style.display = 'none';
-      gridView.style.display = '';
       if (drilldownPc) { drilldownPc.close(); drilldownPc = null; }
       video.srcObject = null;  // stop showing the last drill-down frame
       setPseudoFullscreen(false);  // don't leave the overlay/scroll-lock stuck on
+    }
+
+    // ── View switching: grid <-> drill-down <-> settings ─────────────────
+    function showGrid() {
+      inDrilldown = false;
+      inSettings = false;
+      leaveDrilldown();
+      settingsView.style.display = 'none';
+      gridView.style.display = '';
       // Update the URL without a reload, so back/forward + reload land
       // on the grid rather than re-opening whatever was last viewed.
       history.replaceState(null, '', window.location.pathname);
@@ -919,8 +960,10 @@
 
     function showDrilldown(piName) {
       inDrilldown = true;
+      inSettings = false;
       currentPi = piName;
       gridView.style.display = 'none';
+      settingsView.style.display = 'none';
       drilldownView.style.display = '';
       const pi = pisCache.find(p => p.name === piName);
       drilldownTitle.textContent = pi ? pi.label : piName;
@@ -930,7 +973,19 @@
       closeSidebar();
     }
 
+    function showSettings() {
+      inDrilldown = false;
+      inSettings = true;
+      leaveDrilldown();
+      gridView.style.display = 'none';
+      settingsView.style.display = '';
+      history.replaceState(null, '', window.location.pathname);
+      updateSidebarActive();
+      closeSidebar();
+    }
+
     navCameras.addEventListener('click', showGrid);
+    navSettings.addEventListener('click', showSettings);
     backBtn.addEventListener('click', showGrid);
 
     // ── Grid layout: persistence ──────────────────────────────────────────
