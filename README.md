@@ -101,6 +101,7 @@ ice_port_max = 50200
 | `POST /webrtc/offer?pi=X&stream=main\|lores` | WHEP-style signaling for a browser viewer — body `{"sdp":"..."}` (SDP offer), response `{"sdp":"..."}` (SDP answer). Media then flows over the resulting WebRTC connection, relayed from Pi X. `main` requests are adaptive (see Architecture) — the browser never chooses `main-high`/`main-low` directly. |
 | `GET /status.json?pi=X` | Proxied telemetry JSON from Pi X |
 | `GET /camera?pi=X&id=N` | Switch camera lens on Pi X |
+| `GET /lux-switch?pi=X&enabled=true\|false&threshold=N` | Configure Pi X's automatic lens switching by ambient light — the switch decision itself runs on picam-orchestrator, not here; see that project's README |
 | `GET /osd?pi=X&camera_id=true\|false&time=true\|false` | Toggle OSD overlays |
 | `GET /annotate?pi=X&main=true\|false&lores=true\|false` | Toggle annotation |
 

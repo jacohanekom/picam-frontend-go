@@ -200,30 +200,30 @@
     opacity: 0.5;
     cursor: default;
   }
-  .info-card {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .info-row {
+  /* Paired label + number input, used by the sidebar's lux threshold
+     control -- same row shape as .toggle-row but with a small numeric
+     input instead of a switch. */
+  .lux-threshold-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 0;
+    gap: 10px;
+    padding: 8px 12px;
     font-size: 13px;
-  }
-  .info-row + .info-row { border-top: 1px solid var(--border); }
-  .info-row .label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     color: var(--text-dim);
   }
-  .info-row .label .icon { width: 15px; height: 15px; }
-  .info-row .value {
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
+  .lux-threshold-row input[type="number"] {
+    width: 64px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 5px 8px;
+  }
+  .lux-threshold-row input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent);
   }
   .status-pill {
     display: inline-flex;
@@ -379,20 +379,8 @@
   }
   .camera-tile .tile-footer .dot { margin-right: 4px; }
 
-  /* ── Drill-down: viewer + bottom bar + right panel ───────────────────── */
-  .drilldown {
-    display: flex;
-    flex: 1;
-    gap: 20px;
-    min-height: 0;
-  }
-  .drilldown-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    gap: 16px;
-  }
+  /* ── Drill-down: viewer only — Lens/Annotate/Overlay/Auto-switch now
+     live in the sidebar's Settings section (global, not per-camera). ── */
   .viewer {
     width: 100%;
     background: #000;
@@ -517,46 +505,26 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Bottom bar: Stream + Lens + Annotate, all in one row */
-  .bottom-bar {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 6px 16px;
-  }
-  .bottom-bar .group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 6px 0;
-  }
-  .bottom-bar .group + .group {
-    border-top: 1px solid var(--border);
-  }
-  .bottom-bar .group-label {
+  /* Sidebar Settings: Lens/Annotate/Overlay/Auto-switch groups, each a
+     small uppercase label + its controls, stacked with a divider
+     between groups (same idea as the old bottom-bar's row groups, just
+     vertical to fit the sidebar's width). */
+  .group-label {
     font-size: 11px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-dim);
     flex-shrink: 0;
+    display: block;
+    padding: 0 4px;
+    margin-bottom: 4px;
   }
-  .bottom-bar .group nav.stream-nav {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+  .settings-group {
+    padding: 10px 0;
   }
-
-  /* Right panel: stream info + overlay toggles */
-  .drilldown-side {
-    width: 240px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  .settings-group + .settings-group {
+    border-top: 1px solid var(--border);
   }
 
   .menu-toggle {
@@ -599,16 +567,12 @@
     .overlay-bg.open { display: block; }
     .menu-toggle { display: flex; }
     .content { padding: 64px 16px 24px; }
-    .drilldown { flex-direction: column; }
-    .drilldown-side { width: 100%; }
-    .bottom-bar { gap: 14px; }
   }
 </style>
 </head>
 <body>
 
   <svg style="display:none" aria-hidden="true">
-    <symbol id="ic-calendar" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12" /> <path d="M16 3v4" /> <path d="M8 3v4" /> <path d="M4 11h16" /> <path d="M11 15h1" /> <path d="M12 15v3" /></symbol>
     <symbol id="ic-camera" viewBox="0 0 24 24"><path d="M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2" /> <path d="M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" /></symbol>
     <symbol id="ic-camera-ai" viewBox="0 0 24 24"><path d="M10 20h-5a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v2" /> <path d="M14.362 11.15a3 3 0 1 0 -4.144 4.263" /> <path d="M14 21v-4a2 2 0 1 1 4 0v4" /> <path d="M14 19h4" /> <path d="M21 15v6" /></symbol>
     <symbol id="ic-clock" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" /> <path d="M12 7v5l3 3" /></symbol>
@@ -649,6 +613,82 @@
           </div>
         </nav>
       </div>
+
+      <!-- Settings: global, applies to every configured Pi immediately
+           (not scoped to whichever camera is currently drilled into). -->
+      <div>
+        <div class="section-label">Settings</div>
+
+        <div class="settings-group">
+          <span class="group-label">Lens</span>
+          <nav class="stream-nav vertical" id="cameraNav">
+            <button class="stream-btn" id="btn-cam0" data-camera="0">
+              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 0
+            </button>
+            <button class="stream-btn" id="btn-cam1" data-camera="1">
+              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 1
+            </button>
+          </nav>
+        </div>
+
+        <div class="settings-group">
+          <span class="group-label">Annotate</span>
+          <nav class="stream-nav vertical" id="annotateNav">
+            <button class="stream-btn" id="btn-annotate-main" data-resolution="main">
+              <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Main
+            </button>
+            <button class="stream-btn" id="btn-annotate-lores" data-resolution="lores">
+              <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Lores
+            </button>
+          </nav>
+        </div>
+
+        <div class="settings-group">
+          <span class="group-label">Overlay</span>
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>
+              Camera ID
+            </span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="osdCameraToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
+              Time
+            </span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="osdTimeToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Auto camera switch: the switch decision itself runs on each
+             Pi's own picam-orchestrator (see that project's README) --
+             this is only the remote control. Threshold is shared, but
+             each Pi reads its own lux and switches its own lens. -->
+        <div class="settings-group">
+          <span class="group-label">Auto camera switch</span>
+          <div class="toggle-row">
+            <span class="toggle-label">
+              <svg class="icon" aria-hidden="true"><use href="#ic-sun"/></svg>
+              Enabled
+            </span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="luxSwitchToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="lux-threshold-row">
+            <label for="luxThresholdInput">Threshold (lux)</label>
+            <input type="number" id="luxThresholdInput" min="0" step="1">
+          </div>
+        </div>
+      </div>
     </aside>
 
     <main class="content">
@@ -674,102 +714,18 @@
           <h1 id="drilldownTitle">—</h1>
         </div>
 
-        <div class="drilldown">
-          <div class="drilldown-main">
-            <div class="viewer" id="viewer">
-              <video id="streamVideo" autoplay muted playsinline></video>
-              <div class="loading-overlay" id="loadingOverlay">
-                <span class="spinner"></span>
-                <span id="loadingText">Connecting…</span>
-              </div>
-              <button class="fs-back-btn" id="fsBackBtn" aria-label="Exit fullscreen">
-                <svg class="icon" aria-hidden="true"><use href="#ic-arrow-left"/></svg>
-              </button>
-              <button class="fs-btn" id="fsBtn" aria-label="Toggle fullscreen">
-                <svg class="icon" id="fsIcon" aria-hidden="true"><use href="#ic-maximize"/></svg>
-              </button>
-            </div>
-
-            <!-- Bottom bar: Lens + Annotate. Stream quality (main/lores) is
-                 no longer a manual choice here -- picam-orchestrator picks
-                 it automatically per client based on connection quality
-                 (see webrtcsrv.Client.adaptQuality). -->
-            <div class="bottom-bar">
-
-              <div class="group">
-                <span class="group-label">Lens</span>
-                <nav class="stream-nav" id="cameraNav">
-                  <button class="stream-btn" id="btn-cam0" data-camera="0">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 0
-                  </button>
-                  <button class="stream-btn" id="btn-cam1" data-camera="1">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 1
-                  </button>
-                </nav>
-              </div>
-
-              <div class="group">
-                <span class="group-label">Annotate</span>
-                <nav class="stream-nav" id="annotateNav">
-                  <button class="stream-btn" id="btn-annotate-main" data-resolution="main">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Main
-                  </button>
-                  <button class="stream-btn" id="btn-annotate-lores" data-resolution="lores">
-                    <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Lores
-                  </button>
-                </nav>
-              </div>
-            </div>
+        <div class="viewer" id="viewer">
+          <video id="streamVideo" autoplay muted playsinline></video>
+          <div class="loading-overlay" id="loadingOverlay">
+            <span class="spinner"></span>
+            <span id="loadingText">Connecting…</span>
           </div>
-
-          <!-- Right panel: stream info + overlay toggles -->
-          <aside class="drilldown-side">
-            <div>
-              <div class="section-label">Stream info</div>
-              <div class="info-card">
-                <div class="info-row">
-                  <span class="label"><svg class="icon" aria-hidden="true"><use href="#ic-calendar"/></svg>Date</span>
-                  <span class="value" id="info-date">—</span>
-                </div>
-                <div class="info-row">
-                  <span class="label"><svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>Time</span>
-                  <span class="value" id="info-time">—</span>
-                </div>
-                <div class="info-row">
-                  <span class="label"><svg class="icon" aria-hidden="true"><use href="#ic-sun"/></svg>Lux</span>
-                  <span class="value" id="info-lux">—</span>
-                </div>
-                <div class="info-row">
-                  <span class="label"><svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera</span>
-                  <span class="value" id="info-camera">—</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div class="section-label">Overlay</div>
-              <div class="toggle-row">
-                <span class="toggle-label">
-                  <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>
-                  Camera ID
-                </span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="osdCameraToggle">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              <div class="toggle-row">
-                <span class="toggle-label">
-                  <svg class="icon" aria-hidden="true"><use href="#ic-clock"/></svg>
-                  Time
-                </span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="osdTimeToggle">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-          </aside>
+          <button class="fs-back-btn" id="fsBackBtn" aria-label="Exit fullscreen">
+            <svg class="icon" aria-hidden="true"><use href="#ic-arrow-left"/></svg>
+          </button>
+          <button class="fs-btn" id="fsBtn" aria-label="Toggle fullscreen">
+            <svg class="icon" id="fsIcon" aria-hidden="true"><use href="#ic-maximize"/></svg>
+          </button>
         </div>
       </div>
 
@@ -803,6 +759,8 @@
     const cameraButtons = cameraNav.querySelectorAll('.stream-btn');
     const annotateNav = document.getElementById('annotateNav');
     const annotateButtons = annotateNav.querySelectorAll('.stream-btn');
+    const luxSwitchToggle = document.getElementById('luxSwitchToggle');
+    const luxThresholdInput = document.getElementById('luxThresholdInput');
 
     // Track which Pi the drill-down view is watching — sent as a query
     // param to /webrtc/offer so the frontend knows which backend to
@@ -815,7 +773,6 @@
     let currentCamera = null;  // unknown until the first /status.json poll reports active_camera
     let slowHintTimer = null;
     let pisCache = [];          // last loaded /pis.json result
-    let pollTimer = null;       // drill-down status polling, only runs while drilled in
     let inDrilldown = false;
 
     // WebRTC connections. Unlike the old <img src="/stream">, each
@@ -952,7 +909,6 @@
       gridView.style.display = '';
       if (drilldownPc) { drilldownPc.close(); drilldownPc = null; }
       video.srcObject = null;  // stop showing the last drill-down frame
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
       setPseudoFullscreen(false);  // don't leave the overlay/scroll-lock stuck on
       // Update the URL without a reload, so back/forward + reload land
       // on the grid rather than re-opening whatever was last viewed.
@@ -971,8 +927,6 @@
       history.replaceState(null, '', '?pi=' + encodeURIComponent(piName));
       updateSidebarActive();
       reloadStream();
-      if (!pollTimer) pollTimer = setInterval(pollStatus, 3000);
-      pollStatus();
       closeSidebar();
     }
 
@@ -1325,6 +1279,7 @@
         updateGridCols();
         pisCache = applyGridLayout(pis);
         renderSidebarCameraList(pisCache);
+        settingsPollTick();
         for (const pi of pisCache) {
           const tile = await buildTile(pi);
           cameraGrid.appendChild(tile);
@@ -1373,162 +1328,74 @@
     }
     video.addEventListener('playing', hideLoading);
 
-    // ── Drill-down: Lens (camera 0/1) ─────────────────────────────────────
+    // ── Sidebar Settings: Lens/Annotate/Overlay/Auto-switch ─────────────
+    // Unlike the old per-drilldown-camera controls, these are global —
+    // a change loops through every configured Pi (pisCache) and sends
+    // the same command to each, right away. There's no single "current"
+    // Pi to wait on for confirmation, so these are optimistic-update-
+    // and-fire: the UI updates immediately, and settingsPollTick (below)
+    // self-heals it from the first configured Pi's real state if a
+    // request silently failed on some Pi.
     function setActiveCamera(cameraId) {
       currentCamera = String(cameraId);
       cameraButtons.forEach(b => b.classList.toggle('active', b.dataset.camera === currentCamera));
     }
 
-    // All interactive drill-down controls except fullscreen/back — those
-    // two don't depend on camera state, so disabling them would just be
-    // an unnecessary restriction on navigating away while a switch is
-    // pending. Reused for the camera-switch grayout below.
-    function allDrilldownControls() {
-      return [...cameraButtons, ...annotateButtons, osdCameraToggle, osdTimeToggle];
-    }
-
-    function setControlsDisabled(disabled) {
-      allDrilldownControls().forEach(el => { el.disabled = disabled; });
-    }
-
-    // Polls /status.json on a short interval (not the regular slow
-    // background pollStatus) until telemetry.active_camera actually
-    // equals the requested id — that is the real confirmation a switch
-    // has taken effect, not "a frame arrived" (a frame can arrive before
-    // picam-raw's sensor switch has actually settled) and not a fixed
-    // timer (which would either be too short on a slow switch or feel
-    // sluggish on a fast one). Resolves true on confirmation, false on
-    // timeout.
-    function waitForActiveCamera(cameraId, timeoutMs = 10000, intervalMs = 300) {
-      const targetCamera = String(cameraId);
-      const deadline = Date.now() + timeoutMs;
-      return new Promise((resolve) => {
-        async function check() {
-          if (!inDrilldown) { resolve(false); return; }
-          try {
-            const resp = await fetch('/status.json?pi=' + encodeURIComponent(currentPi));
-            const data = await resp.json();
-            const active = data.telemetry && data.telemetry.active_camera;
-            if (typeof active === 'number' && String(active) === targetCamera) {
-              resolve(true);
-              return;
-            }
-          } catch (e) {
-            // transient fetch failure — keep retrying until the deadline
-          }
-          if (Date.now() >= deadline) { resolve(false); return; }
-          setTimeout(check, intervalMs);
-        }
-        check();
-      });
-    }
-
-    // Switching cameras does NOT reload the stream connection itself —
-    // picam-raw switches its active sensor and picam-orchestrator keeps
-    // encoding from whichever UDP frames arrive next, so the existing
-    // /stream connection just starts showing the new camera's frames on
-    // its own. What we DO need to wait for is picam-raw's own
-    // confirmation that the switch actually took effect (see
-    // waitForActiveCamera above) — only then is the loading state cleared.
-    async function selectCamera(cameraId) {
-      if (!currentPi) return;
-      const previousCamera = currentCamera;
+    async function broadcastCamera(cameraId) {
       setActiveCamera(cameraId);
-      cameraNav.dataset.pending = '1';
-      showLoading();
-      setControlsDisabled(true);
-      try {
-        const resp = await fetch('/camera?pi=' + encodeURIComponent(currentPi) +
-                                  '&id=' + encodeURIComponent(cameraId));
-        const data = await resp.json();
-        if (!data.ok) {
-          setActiveCamera(previousCamera);
-          return;
-        }
-        const confirmed = await waitForActiveCamera(cameraId);
-        if (!confirmed) {
-          // picam-raw never confirmed the switch within the timeout —
-          // leave the UI showing what was actually requested rather than
-          // silently reverting, since the switch command itself DID
-          // succeed (data.ok was true); only the confirmation poll timed
-          // out. The next regular background poll will correct the UI
-          // if the camera turns out to still be on the old index.
-          loadingText.textContent = 'Switch sent, but not yet confirmed';
-        }
-      } catch (e) {
-        setActiveCamera(previousCamera);
-      } finally {
-        setControlsDisabled(false);
-        hideLoading();
-        delete cameraNav.dataset.pending;
-      }
+      await Promise.all(pisCache.map(pi =>
+        fetch('/camera?pi=' + encodeURIComponent(pi.name) + '&id=' + encodeURIComponent(cameraId)).catch(() => {})
+      ));
     }
-    cameraButtons.forEach(b => b.addEventListener('click', () => selectCamera(b.dataset.camera)));
+    cameraButtons.forEach(b => b.addEventListener('click', () => broadcastCamera(b.dataset.camera)));
 
-    // ── Drill-down: OSD toggles (Camera ID / Time) ───────────────────────
-    // Toggling sends the change to the backend immediately, but the
-    // checkbox state shown to the user is held ("pending") until the
-    // backend confirms it — this stops the 3-second status poll from
-    // snapping the switch back to its old position while the request
-    // for this click is still in flight.
-    function wireOsdToggle(toggleEl, queryParamName, responseFieldName) {
-      toggleEl.addEventListener('change', async () => {
-        if (!currentPi) { toggleEl.checked = !toggleEl.checked; return; }
-        const wanted = toggleEl.checked;
-        toggleEl.dataset.pending = '1';
-        toggleEl.disabled = true;
-        try {
-          const resp = await fetch('/osd?pi=' + encodeURIComponent(currentPi) +
-                                    '&' + queryParamName + '=' + (wanted ? 'true' : 'false'));
-          const data = await resp.json();
-          if (typeof data[responseFieldName] === 'boolean') {
-            toggleEl.checked = data[responseFieldName];
-          } else {
-            toggleEl.checked = !wanted;
-          }
-        } catch (e) {
-          toggleEl.checked = !wanted;
-        } finally {
-          toggleEl.disabled = false;
-          delete toggleEl.dataset.pending;
-        }
-      });
-    }
-    wireOsdToggle(osdCameraToggle, 'camera_id', 'camera_id_enabled');
-    wireOsdToggle(osdTimeToggle,   'time',      'time_enabled');
-
-    // ── Drill-down: Annotate buttons (Main, Lores — independently toggleable) ──
     // Unlike Lens (where clicking selects ONE camera exclusively), each
     // Annotate button represents its OWN resolution's annotation state —
-    // both can be active, both off, or just one. A click toggles only
-    // that button's own .active class and sends only that resolution's
-    // flag to the backend; the other resolution's state is untouched.
-    async function toggleAnnotate(btn) {
-      if (!currentPi) return;
+    // both can be active, both off, or just one.
+    async function broadcastAnnotate(btn) {
       const resolution = btn.dataset.resolution;  // 'main' or 'lores'
-      const responseField = resolution + '_annotated';
       const wanted = !btn.classList.contains('active');
-
-      btn.dataset.pending = '1';
-      btn.disabled = true;
       btn.classList.toggle('active', wanted);  // optimistic UI
-      try {
-        const resp = await fetch('/annotate?pi=' + encodeURIComponent(currentPi) +
-                                  '&' + resolution + '=' + (wanted ? 'true' : 'false'));
-        const data = await resp.json();
-        if (typeof data[responseField] === 'boolean') {
-          btn.classList.toggle('active', data[responseField]);
-        } else {
-          btn.classList.toggle('active', !wanted);  // unexpected response — revert
-        }
-      } catch (e) {
-        btn.classList.toggle('active', !wanted);  // request failed — revert
-      } finally {
-        btn.disabled = false;
-        delete btn.dataset.pending;
-      }
+      await Promise.all(pisCache.map(pi =>
+        fetch('/annotate?pi=' + encodeURIComponent(pi.name) + '&' + resolution + '=' + wanted).catch(() => {})
+      ));
     }
-    annotateButtons.forEach(b => b.addEventListener('click', () => toggleAnnotate(b)));
+    annotateButtons.forEach(b => b.addEventListener('click', () => broadcastAnnotate(b)));
+
+    // Generic global-broadcast toggle: used for both the Overlay switches
+    // (/osd, camera_id/time) and the lux-switch enabled switch (/lux-switch,
+    // enabled).
+    function wireToggleGlobal(toggleEl, path, param) {
+      toggleEl.addEventListener('change', () => {
+        const wanted = toggleEl.checked;
+        Promise.all(pisCache.map(pi =>
+          fetch(path + '?pi=' + encodeURIComponent(pi.name) + '&' + param + '=' + wanted).catch(() => {})
+        ));
+      });
+    }
+    wireToggleGlobal(osdCameraToggle, '/osd', 'camera_id');
+    wireToggleGlobal(osdTimeToggle, '/osd', 'time');
+
+    // ── Auto camera switch: the actual lux-crossing decision runs on
+    // each Pi's own picam-orchestrator (internal/luxswitch) -- this is
+    // only the remote control that configures it. Threshold is shared
+    // across every Pi, but each Pi reads its own lux and switches its
+    // own lens independently. While enabled, the manual Lens buttons
+    // are disabled -- different Pis can legitimately be on different
+    // lenses at once under auto mode, so a single shared button pair
+    // can't represent that truthfully, and a manual click would just
+    // get overridden by the orchestrator's own next evaluation anyway.
+    wireToggleGlobal(luxSwitchToggle, '/lux-switch', 'enabled');
+    luxSwitchToggle.addEventListener('change', () => {
+      cameraButtons.forEach(b => { b.disabled = luxSwitchToggle.checked; });
+    });
+    luxThresholdInput.addEventListener('change', () => {
+      const value = luxThresholdInput.value;
+      if (value === '') return;
+      Promise.all(pisCache.map(pi =>
+        fetch('/lux-switch?pi=' + encodeURIComponent(pi.name) + '&threshold=' + encodeURIComponent(value)).catch(() => {})
+      ));
+    });
 
     // ── Pseudo-fullscreen ─────────────────────────────────────────────────
     // Deliberately NOT using the native Fullscreen API, even though
@@ -1566,80 +1433,62 @@
       if (e.key === 'Escape' && pseudoFullscreen) setPseudoFullscreen(false);
     });
 
-    // ── Camera-feed clock (NOT the viewer's browser clock) ───────────────
-    let frameClockAnchorMs = null;
-    let receivedAtMs = null;
+    // ── Global settings poller ────────────────────────────────────────────
+    // Runs unconditionally from page load, regardless of grid vs.
+    // drill-down view -- Settings now lives in the sidebar, visible from
+    // both. Syncs the sidebar controls from the first configured Pi's
+    // /status.json as a representative state (every Pi is kept in sync by
+    // the broadcast handlers above; this just self-heals the UI if one
+    // silently didn't get a change, and reflects orchestrator-driven state
+    // like lux-switch's own camera selection). There is no client-side
+    // lux evaluation here -- that runs entirely on picam-orchestrator
+    // (internal/luxswitch), so it keeps working with no browser open.
+    const SETTINGS_POLL_MS = 5000;
 
-    function setFrameClockAnchor(frameTsUs) {
-      if (!frameTsUs) return;
-      frameClockAnchorMs = frameTsUs / 1000;
-      receivedAtMs = performance.now();
-    }
-
-    function updateClock() {
-      const dateEl = document.getElementById('info-date');
-      const timeEl = document.getElementById('info-time');
-      if (!dateEl || !timeEl) return;
-      if (frameClockAnchorMs === null) {
-        dateEl.textContent = '—';
-        timeEl.textContent = '—';
-        return;
+    function syncSettingsUI(data) {
+      if (typeof data.camera_id_enabled === 'boolean' && document.activeElement !== osdCameraToggle) {
+        osdCameraToggle.checked = data.camera_id_enabled;
       }
-      const elapsed = performance.now() - receivedAtMs;
-      const now = new Date(frameClockAnchorMs + elapsed);
-      dateEl.textContent =
-        now.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-      timeEl.textContent =
-        now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (typeof data.time_enabled === 'boolean' && document.activeElement !== osdTimeToggle) {
+        osdTimeToggle.checked = data.time_enabled;
+      }
+      annotateButtons.forEach(btn => {
+        const field = btn.dataset.resolution + '_annotated';
+        if (typeof data[field] === 'boolean') {
+          btn.classList.toggle('active', data[field]);
+        }
+      });
+
+      const luxEnabled = data.lux_switch_enabled;
+      if (typeof luxEnabled === 'boolean' && document.activeElement !== luxSwitchToggle) {
+        luxSwitchToggle.checked = luxEnabled;
+      }
+      if (typeof data.lux_switch_threshold === 'number' && document.activeElement !== luxThresholdInput) {
+        luxThresholdInput.value = data.lux_switch_threshold;
+      }
+      // While auto-switch is on, different Pis can legitimately be on
+      // different lenses at once -- a single shared button pair can't
+      // represent that truthfully, so it's disabled instead of synced.
+      cameraButtons.forEach(b => { b.disabled = !!luxEnabled; });
+      const t = data.telemetry || {};
+      if (!luxEnabled && typeof t.active_camera === 'number') {
+        setActiveCamera(t.active_camera);
+      }
     }
 
-    // ── Drill-down status polling ─────────────────────────────────────────
-    async function pollStatus() {
-      if (!inDrilldown || !currentPi) return;
+    async function settingsPollTick() {
+      if (pisCache.length === 0) return;
       try {
-        const resp = await fetch('/status.json?pi=' + encodeURIComponent(currentPi));
+        const resp = await fetch('/status.json?pi=' + encodeURIComponent(pisCache[0].name));
         const data = await resp.json();
-
-        setFrameClockAnchor(data.frame_ts_us);
-        updateClock();
-
-        if (typeof data.camera_id_enabled === 'boolean' && !osdCameraToggle.dataset.pending) {
-          osdCameraToggle.checked = data.camera_id_enabled;
-        }
-        if (typeof data.time_enabled === 'boolean' && !osdTimeToggle.dataset.pending) {
-          osdTimeToggle.checked = data.time_enabled;
-        }
-
-        // Both Annotate buttons sync from their OWN field — main_annotated
-        // / lores_annotated — independent of whichever stream is currently
-        // being viewed, since each button represents its resolution's own
-        // state, not "annotation for the stream you happen to be watching".
-        annotateButtons.forEach(btn => {
-          const field = btn.dataset.resolution + '_annotated';
-          if (typeof data[field] === 'boolean' && !btn.dataset.pending) {
-            btn.classList.toggle('active', data[field]);
-          }
-        });
-
-        const t = data.telemetry || {};
-        document.getElementById('info-lux').textContent =
-          (typeof t.lux === 'number' && t.lux >= 0) ? Math.round(t.lux) + ' lx' : '—';
-        document.getElementById('info-camera').textContent =
-          (typeof t.active_camera === 'number') ? String(t.active_camera) : '—';
-
-        if (typeof t.active_camera === 'number' && !cameraNav.dataset.pending) {
-          setActiveCamera(t.active_camera);
-        }
+        syncSettingsUI(data);
       } catch (e) {
-        // status poll failed — nothing to update here now that the
-        // drill-down's connection indicator has been removed; the
-        // sidebar info fields just keep showing their last-known values.
+        // transient — retried next tick
       }
     }
+    setInterval(settingsPollTick, SETTINGS_POLL_MS);
 
     // ── Startup ───────────────────────────────────────────────────────────
-    setInterval(updateClock, 1000);
-
     if (currentPi) {
       // A pi was specified in the URL on load — go straight to the
       // drill-down for it rather than showing the grid first.
@@ -1647,6 +1496,7 @@
         pisCache = pis;
         renderSidebarCameraList(pisCache);
         showDrilldown(currentPi);
+        settingsPollTick();
       }).catch(() => { showGrid(); });
     } else {
       showGrid();
