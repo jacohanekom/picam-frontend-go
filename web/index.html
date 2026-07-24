@@ -144,6 +144,23 @@
     pointer-events: none;
   }
   .stream-btn:disabled:hover { background: transparent; color: var(--text-dim); }
+  /* Lens picker -- a dropdown of camera descriptions (Day/Night) rather
+     than exclusive-select buttons, since there are exactly two mutually
+     exclusive options and a select reads more like "pick one" here. */
+  .settings-select {
+    width: 100%;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  .settings-select:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
   .toggle-row {
     display: flex;
     align-items: center;
@@ -507,11 +524,8 @@
 
   /* Settings page: Lens/Annotate/Overlay/Auto-switch groups, each a
      small uppercase label + its controls, stacked with a divider
-     between groups. Constrained to a narrow column even though the
-     page itself has the full content area to work with -- a settings
-     list reads better narrow than stretched full-width. */
+     between groups. Uses the full content-area width. */
   .settings-page {
-    max-width: 420px;
     background: var(--bg-panel);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -685,26 +699,34 @@
         <div class="settings-page">
           <div class="settings-group">
             <span class="group-label">Lens</span>
-            <nav class="stream-nav vertical" id="cameraNav">
-              <button class="stream-btn" id="btn-cam0" data-camera="0">
-                <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 0
-              </button>
-              <button class="stream-btn" id="btn-cam1" data-camera="1">
-                <svg class="icon" aria-hidden="true"><use href="#ic-camera"/></svg>Camera 1
-              </button>
-            </nav>
+            <select class="settings-select" id="cameraSelect">
+              <option value="0">Day</option>
+              <option value="1">Night</option>
+            </select>
           </div>
 
           <div class="settings-group">
             <span class="group-label">Annotate</span>
-            <nav class="stream-nav vertical" id="annotateNav">
-              <button class="stream-btn" id="btn-annotate-main" data-resolution="main">
-                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Main
-              </button>
-              <button class="stream-btn" id="btn-annotate-lores" data-resolution="lores">
-                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>Lores
-              </button>
-            </nav>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>
+                Full Stream
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="annotateMainToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-label">
+                <svg class="icon" aria-hidden="true"><use href="#ic-focus-2"/></svg>
+                Previews
+              </span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="annotateLoresToggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
 
           <div class="settings-group">
@@ -783,10 +805,9 @@
     const loadingText    = document.getElementById('loadingText');
     const osdCameraToggle = document.getElementById('osdCameraToggle');
     const osdTimeToggle   = document.getElementById('osdTimeToggle');
-    const cameraNav = document.getElementById('cameraNav');
-    const cameraButtons = cameraNav.querySelectorAll('.stream-btn');
-    const annotateNav = document.getElementById('annotateNav');
-    const annotateButtons = annotateNav.querySelectorAll('.stream-btn');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const annotateMainToggle = document.getElementById('annotateMainToggle');
+    const annotateLoresToggle = document.getElementById('annotateLoresToggle');
     const luxSwitchToggle = document.getElementById('luxSwitchToggle');
     const luxThresholdInput = document.getElementById('luxThresholdInput');
 
@@ -1393,7 +1414,7 @@
     // request silently failed on some Pi.
     function setActiveCamera(cameraId) {
       currentCamera = String(cameraId);
-      cameraButtons.forEach(b => b.classList.toggle('active', b.dataset.camera === currentCamera));
+      cameraSelect.value = currentCamera;
     }
 
     async function broadcastCamera(cameraId) {
@@ -1402,23 +1423,11 @@
         fetch('/camera?pi=' + encodeURIComponent(pi.name) + '&id=' + encodeURIComponent(cameraId)).catch(() => {})
       ));
     }
-    cameraButtons.forEach(b => b.addEventListener('click', () => broadcastCamera(b.dataset.camera)));
+    cameraSelect.addEventListener('change', () => broadcastCamera(cameraSelect.value));
 
-    // Unlike Lens (where clicking selects ONE camera exclusively), each
-    // Annotate button represents its OWN resolution's annotation state —
-    // both can be active, both off, or just one.
-    async function broadcastAnnotate(btn) {
-      const resolution = btn.dataset.resolution;  // 'main' or 'lores'
-      const wanted = !btn.classList.contains('active');
-      btn.classList.toggle('active', wanted);  // optimistic UI
-      await Promise.all(pisCache.map(pi =>
-        fetch('/annotate?pi=' + encodeURIComponent(pi.name) + '&' + resolution + '=' + wanted).catch(() => {})
-      ));
-    }
-    annotateButtons.forEach(b => b.addEventListener('click', () => broadcastAnnotate(b)));
-
-    // Generic global-broadcast toggle: used for both the Overlay switches
-    // (/osd, camera_id/time) and the lux-switch enabled switch (/lux-switch,
+    // Generic global-broadcast toggle: used for the Annotate switches
+    // (/annotate, main/lores), the Overlay switches (/osd,
+    // camera_id/time), and the lux-switch enabled switch (/lux-switch,
     // enabled).
     function wireToggleGlobal(toggleEl, path, param) {
       toggleEl.addEventListener('change', () => {
@@ -1428,6 +1437,8 @@
         ));
       });
     }
+    wireToggleGlobal(annotateMainToggle, '/annotate', 'main');
+    wireToggleGlobal(annotateLoresToggle, '/annotate', 'lores');
     wireToggleGlobal(osdCameraToggle, '/osd', 'camera_id');
     wireToggleGlobal(osdTimeToggle, '/osd', 'time');
 
@@ -1435,14 +1446,14 @@
     // each Pi's own picam-orchestrator (internal/luxswitch) -- this is
     // only the remote control that configures it. Threshold is shared
     // across every Pi, but each Pi reads its own lux and switches its
-    // own lens independently. While enabled, the manual Lens buttons
-    // are disabled -- different Pis can legitimately be on different
-    // lenses at once under auto mode, so a single shared button pair
-    // can't represent that truthfully, and a manual click would just
+    // own lens independently. While enabled, the manual Lens select is
+    // disabled -- different Pis can legitimately be on different
+    // lenses at once under auto mode, so a single shared control
+    // can't represent that truthfully, and a manual change would just
     // get overridden by the orchestrator's own next evaluation anyway.
     wireToggleGlobal(luxSwitchToggle, '/lux-switch', 'enabled');
     luxSwitchToggle.addEventListener('change', () => {
-      cameraButtons.forEach(b => { b.disabled = luxSwitchToggle.checked; });
+      cameraSelect.disabled = luxSwitchToggle.checked;
     });
     luxThresholdInput.addEventListener('change', () => {
       const value = luxThresholdInput.value;
@@ -1507,12 +1518,12 @@
       if (typeof data.time_enabled === 'boolean' && document.activeElement !== osdTimeToggle) {
         osdTimeToggle.checked = data.time_enabled;
       }
-      annotateButtons.forEach(btn => {
-        const field = btn.dataset.resolution + '_annotated';
-        if (typeof data[field] === 'boolean') {
-          btn.classList.toggle('active', data[field]);
-        }
-      });
+      if (typeof data.main_annotated === 'boolean' && document.activeElement !== annotateMainToggle) {
+        annotateMainToggle.checked = data.main_annotated;
+      }
+      if (typeof data.lores_annotated === 'boolean' && document.activeElement !== annotateLoresToggle) {
+        annotateLoresToggle.checked = data.lores_annotated;
+      }
 
       const luxEnabled = data.lux_switch_enabled;
       if (typeof luxEnabled === 'boolean' && document.activeElement !== luxSwitchToggle) {
@@ -1522,9 +1533,9 @@
         luxThresholdInput.value = data.lux_switch_threshold;
       }
       // While auto-switch is on, different Pis can legitimately be on
-      // different lenses at once -- a single shared button pair can't
+      // different lenses at once -- a single shared control can't
       // represent that truthfully, so it's disabled instead of synced.
-      cameraButtons.forEach(b => { b.disabled = !!luxEnabled; });
+      cameraSelect.disabled = !!luxEnabled;
       const t = data.telemetry || {};
       if (!luxEnabled && typeof t.active_camera === 'number') {
         setActiveCamera(t.active_camera);
