@@ -684,12 +684,10 @@
           <!-- populated by JS from /pis.json: one shortcut per configured
                camera, jumping straight to its drill-down view -->
         </div>
-      </nav>
-
-      <!-- Settings: its own page (see #settingsView) -- global, applies
-           to every configured Pi immediately, not scoped to whichever
-           camera is currently drilled into. -->
-      <nav class="stream-nav vertical">
+        <!-- Settings: its own page (see #settingsView) -- global, applies
+             to every configured Pi immediately, not scoped to whichever
+             camera is currently drilled into. Same nav list as Cameras
+             above (not a separate section) -- just another top-level item. -->
         <button class="nav-btn" id="navSettings">
           <svg class="icon" aria-hidden="true"><use href="#ic-settings"/></svg>Settings
         </button>
