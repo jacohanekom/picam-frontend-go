@@ -628,18 +628,15 @@
         <span>PiCam</span>
       </div>
 
-      <div>
-        <div class="section-label">Menu</div>
-        <nav class="stream-nav vertical">
-          <button class="nav-btn" id="navCameras">
-            <svg class="icon" aria-hidden="true"><use href="#ic-grid"/></svg>Cameras
-          </button>
-          <div id="sidebarCameraList">
-            <!-- populated by JS from /pis.json: one shortcut per configured
-                 camera, jumping straight to its drill-down view -->
-          </div>
-        </nav>
-      </div>
+      <nav class="stream-nav vertical">
+        <button class="nav-btn" id="navCameras">
+          <svg class="icon" aria-hidden="true"><use href="#ic-grid"/></svg>Cameras
+        </button>
+        <div id="sidebarCameraList">
+          <!-- populated by JS from /pis.json: one shortcut per configured
+               camera, jumping straight to its drill-down view -->
+        </div>
+      </nav>
 
       <!-- Settings: its own page (see #settingsView) -- global, applies
            to every configured Pi immediately, not scoped to whichever
